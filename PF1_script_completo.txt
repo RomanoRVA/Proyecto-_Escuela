@@ -1,0 +1,718 @@
+CREATE DATABASE PF1;
+USE PF1;
+
+-- TABLAS
+
+CREATE TABLE MetodosPago(
+    metodo_id INT PRIMARY KEY IDENTITY(1,1),
+    nombre VARCHAR(30) NOT NULL UNIQUE
+);
+
+CREATE TABLE Estudiantes(
+    estudiante_id INT PRIMARY KEY IDENTITY (1,1),
+    nombre_completo VARCHAR(100) NOT NULL,
+    email VARBINARY(256),
+    telefono NVARCHAR(20),
+    direccion VARCHAR(150),
+    tipo_documento VARCHAR(20) NOT NULL,
+    numero_documento VARBINARY(256) NOT NULL UNIQUE,
+    fecha_registro DATETIME DEFAULT GETDATE()
+);
+
+select * from cursos
+
+CREATE TABLE Cursos(
+    curso_id INT PRIMARY KEY IDENTITY (1,1),
+    nombre_curso VARCHAR(100) NOT NULL,
+    categoria VARCHAR(100) NOT NULL,
+    cupo_maximo INT DEFAULT (5),
+    duracion_horas INT NOT NULL,
+    costo DECIMAL(10,2) NOT NULL,
+    estado VARCHAR(20) NOT NULL CHECK (estado IN ('activo','inactivo'))
+);
+
+CREATE TABLE Instructores(
+    instructor_id INT PRIMARY KEY IDENTITY (1,1),
+    nombre_completo VARCHAR(100) NOT NULL,
+    especialidad VARCHAR(50),
+    cedula_profesional VARBINARY(256) NOT NULL UNIQUE,
+    usuario VARCHAR(50) NOT NULL UNIQUE,
+    contrasena VARBINARY(256) NOT NULL,
+    estado VARCHAR(20) NOT NULL CHECK (estado IN ('activo','inactivo'))
+);
+CREATE TABLE Curso_Instructor(
+    curso_id INT,
+    instructor_id INT,
+    PRIMARY KEY (curso_id, instructor_id),
+    FOREIGN KEY (curso_id) REFERENCES Cursos(curso_id),
+    FOREIGN KEY (instructor_id) REFERENCES Instructores(instructor_id)
+);
+
+CREATE TABLE Inscripciones(
+    inscripcion_id INT PRIMARY KEY IDENTITY (1,1),
+    estudiante_id INT NOT NULL,
+    curso_id INT NOT NULL,
+    fecha_inscripcion DATETIME DEFAULT GETDATE(),
+    estado VARCHAR(20) NOT NULL CHECK (estado IN ('activa','cancelada','finalizada')),
+    total_pago DECIMAL(10,2) NOT NULL,
+    FOREIGN KEY (estudiante_id) REFERENCES Estudiantes(estudiante_id),
+    FOREIGN KEY (curso_id) REFERENCES Cursos(curso_id)
+);
+
+CREATE TABLE Evaluaciones (
+    evaluacion_id INT PRIMARY KEY IDENTITY (1,1),
+    inscripcion_id INT NOT NULL,
+    calificacion DECIMAL(5,2),
+    comentarios VARBINARY(MAX),
+    fecha DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (inscripcion_id) REFERENCES Inscripciones(inscripcion_id)
+);
+
+CREATE TABLE Pagos (
+    pago_id INT PRIMARY KEY IDENTITY (1,1),
+    inscripcion_id INT NOT NULL,
+    fecha_pago DATETIME DEFAULT GETDATE(),
+    metodo_id INT NOT NULL,
+    referencia_pago VARBINARY(MAX),
+    monto DECIMAL(10,2),
+    FOREIGN KEY (inscripcion_id) REFERENCES Inscripciones(inscripcion_id),
+    FOREIGN KEY (metodo_id) REFERENCES MetodosPago(metodo_id)
+);
+
+-- AUDIT
+
+select * from Insc_In
+
+CREATE TABLE Insc_In(
+    inscripcion_id_In INT PRIMARY KEY IDENTITY (1,1),
+    inscripcion_id INT,
+    estudiante_id INT,
+    curso_id INT,
+    fecha_inscripcion DATETIME,
+    estado VARCHAR(20),
+    total_pago DECIMAL(10,2),
+    Fecha_insercion DATETIME DEFAULT GETDATE()
+);
+
+CREATE TABLE Insc_Upd(
+    inscripcion_id_Upd INT PRIMARY KEY IDENTITY (1,1),
+    inscripcion_id INT,
+    estudiante_id INT,
+    curso_id INT,
+    fecha_inscripcion DATETIME,
+    estado VARCHAR(20),
+    total_pago DECIMAL(10,2),
+    Fecha_Cambios DATETIME DEFAULT GETDATE()
+);
+
+CREATE TABLE Insc_Del(
+    inscripcion_id_Del INT PRIMARY KEY IDENTITY (1,1),
+    inscripcion_id INT,
+    estudiante_id INT,
+    curso_id INT,
+    fecha_inscripcion DATETIME,
+    estado VARCHAR(20),
+    total_pago DECIMAL(10,2),
+    Fecha_borrado DATETIME DEFAULT GETDATE()
+);
+
+-- EVALUACIONES
+
+CREATE TABLE Evaluaciones_In (
+    evaluacion_id_In INT PRIMARY KEY IDENTITY (1,1),
+    evaluacion_id INT,
+    inscripcion_id INT,
+    calificacion DECIMAL(5,2),
+    comentarios VARCHAR(MAX),
+    fecha_Insert DATETIME DEFAULT GETDATE()
+);
+
+CREATE TABLE Evaluaciones_Upd (
+    evaluacion_id_Upd INT PRIMARY KEY IDENTITY (1,1),
+    evaluacion_id INT,
+    inscripcion_id INT,
+    calificacion DECIMAL(5,2),
+    comentarios VARCHAR(MAX),
+    fecha_Update DATETIME DEFAULT GETDATE()
+);
+
+CREATE TABLE Evaluaciones_Del (
+    evaluacion_id_Del INT PRIMARY KEY IDENTITY (1,1),
+    evaluacion_id INT,
+    inscripcion_id INT,
+    calificacion DECIMAL(5,2),
+    comentarios VARCHAR(MAX),
+    fecha_Delete DATETIME DEFAULT GETDATE()
+);
+
+-- PAGOS
+
+CREATE TABLE Pagos_In (
+    pago_id_In INT PRIMARY KEY IDENTITY (1,1),
+    pago_id INT,
+    inscripcion_id INT,
+    Fecha_ins DATETIME DEFAULT GETDATE(),
+    metodo_id INT,
+    referencia_pago VARCHAR(100),
+    monto DECIMAL(10,2)
+);
+
+CREATE TABLE Pagos_Upd (
+    pago_id_Upd INT PRIMARY KEY IDENTITY (1,1),
+    pago_id INT,
+    inscripcion_id INT,
+    Fecha_upd DATETIME DEFAULT GETDATE(),
+    metodo_id INT,
+    referencia_pago VARCHAR(100),
+    monto DECIMAL(10,2)
+);
+
+CREATE TABLE Pagos_Del (
+    pago_id_Del INT PRIMARY KEY IDENTITY (1,1),
+    pago_id INT,
+    inscripcion_id INT,
+    Fecha_del DATETIME DEFAULT GETDATE(),
+    metodo_id INT,
+    referencia_pago VARCHAR(100),
+    monto DECIMAL(10,2)
+);
+
+CREATE TABLE Detalle_Pago(
+    detalle_id INT PRIMARY KEY IDENTITY (1,1),
+    pago_id INT NOT NULL,
+    concepto VARCHAR(100),
+    cantidad INT,
+    precio_unitario DECIMAL(10,2),
+    FOREIGN KEY (pago_id) REFERENCES Pagos(pago_id)
+);
+
+
+-- TRIGGERS
+
+CREATE TRIGGER Trigger_insc_In 
+ON Inscripciones 
+AFTER INSERT 
+AS
+BEGIN
+    INSERT INTO Insc_In (inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago)
+    SELECT inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_insc_Upd 
+ON Inscripciones 
+AFTER UPDATE 
+AS
+BEGIN
+    INSERT INTO Insc_Upd (inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago)
+    SELECT inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_insc_Del 
+ON Inscripciones 
+AFTER DELETE 
+AS
+BEGIN
+    INSERT INTO Insc_Del (inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago)
+    SELECT inscripcion_id,estudiante_id,curso_id,fecha_inscripcion,estado,total_pago
+    FROM deleted;
+END;
+
+
+--Aqui ya no me dejo 
+CREATE TRIGGER Trigger_Evalu_In 
+ON Evaluaciones 
+AFTER INSERT 
+AS
+BEGIN
+    INSERT INTO Evaluaciones_In 
+    (evaluacion_id, inscripcion_id, calificacion, comentarios, fecha_Insert)
+    SELECT 
+        evaluacion_id,
+        inscripcion_id,
+        calificacion,
+        CONVERT(VARCHAR(MAX), DECRYPTBYPASSPHRASE('clave123', comentarios)),
+        GETDATE()
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_Evalu_Upd 
+ON Evaluaciones 
+AFTER UPDATE 
+AS
+BEGIN
+    INSERT INTO Evaluaciones_Upd 
+    (evaluacion_id, inscripcion_id, calificacion, comentarios, fecha_Update)
+    SELECT 
+        evaluacion_id,
+        inscripcion_id,
+        calificacion,
+        CONVERT(VARCHAR(MAX), DECRYPTBYPASSPHRASE('clave123', comentarios)),
+        GETDATE()
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_Evalu_Del 
+ON Evaluaciones 
+AFTER DELETE 
+AS
+BEGIN
+    INSERT INTO Evaluaciones_Del 
+    (evaluacion_id, inscripcion_id, calificacion, comentarios, fecha_Delete)
+    SELECT 
+        evaluacion_id,
+        inscripcion_id,
+        calificacion,
+        CONVERT(VARCHAR(MAX), DECRYPTBYPASSPHRASE('clave123', comentarios)),
+        GETDATE()
+    FROM deleted;
+END;
+
+--Aqui ya 
+CREATE TRIGGER Trigger_Pagos_In 
+ON Pagos 
+AFTER INSERT 
+AS
+BEGIN
+    INSERT INTO Pagos_In (pago_id,inscripcion_id,metodo_id,referencia_pago,monto)
+    SELECT pago_id,inscripcion_id,metodo_id,
+    CONVERT(VARCHAR(100), referencia_pago),monto
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_Pagos_Upd 
+ON Pagos 
+AFTER UPDATE 
+AS
+BEGIN
+    INSERT INTO Pagos_Upd (pago_id,inscripcion_id,metodo_id,referencia_pago,monto)
+    SELECT pago_id,inscripcion_id,metodo_id,
+    CONVERT(VARCHAR(100), referencia_pago),monto
+    FROM inserted;
+END;
+
+CREATE TRIGGER Trigger_Pagos_Del 
+ON Pagos 
+AFTER DELETE 
+AS
+BEGIN
+    INSERT INTO Pagos_Del (pago_id,inscripcion_id,metodo_id,referencia_pago,monto)
+    SELECT pago_id,inscripcion_id,metodo_id,
+    CONVERT(VARCHAR(100), referencia_pago),monto
+    FROM deleted;
+END;
+
+CREATE TRIGGER Trigger_actualizar_estado_cupo
+ON Inscripciones
+AFTER INSERT, DELETE, UPDATE
+AS
+BEGIN
+    UPDATE C
+    SET estado = 
+        CASE 
+            WHEN ISNULL(T.inscritos, 0) >= C.cupo_maximo THEN 'inactivo'
+            ELSE 'activo'
+        END
+    FROM Cursos C
+    LEFT JOIN (
+        SELECT curso_id, COUNT(*) AS inscritos
+        FROM Inscripciones
+        WHERE estado = 'activa'
+        GROUP BY curso_id
+    ) T ON C.curso_id = T.curso_id;
+END;
+
+-- PROCEDIMIENTOS
+
+CREATE PROCEDURE RegistrarEstudiante
+(
+    @nombre_completo VARCHAR(100),
+    @email VARCHAR(100),
+    @telefono NVARCHAR(20),
+    @direccion VARCHAR(150),
+    @tipo_documento VARCHAR(20),
+    @numero_documento VARCHAR(50)
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Estudiantes
+    VALUES (
+        @nombre_completo,
+        ENCRYPTBYPASSPHRASE('clave123', @email),
+        @telefono,
+        @direccion,
+        @tipo_documento,
+        ENCRYPTBYPASSPHRASE('clave123', @numero_documento),
+        GETDATE()
+    );
+END;
+
+CREATE PROCEDURE RegistrarInscripcion
+(
+    @estudiante_id INT,
+    @curso_id INT
+)
+AS
+BEGIN
+    DECLARE @costo DECIMAL(10,2);
+
+    SELECT @costo = costo FROM Cursos WHERE curso_id = @curso_id;
+
+    INSERT INTO Inscripciones (estudiante_id,curso_id,estado,total_pago)
+    VALUES (@estudiante_id,@curso_id,'activa',@costo);
+END;
+
+CREATE PROCEDURE RegistrarEvaluacion
+(
+    @inscripcion_id INT,
+    @calificacion DECIMAL(5,2),
+    @comentarios VARCHAR(MAX)
+)
+AS
+BEGIN
+    INSERT INTO Evaluaciones
+    VALUES (
+        @inscripcion_id,
+        @calificacion,
+        ENCRYPTBYPASSPHRASE('clave123', @comentarios),
+        GETDATE()
+    );
+END;
+
+CREATE PROCEDURE CursoDemanda
+AS
+BEGIN
+    SELECT 
+        C.nombre_curso,
+        COUNT(I.inscripcion_id) AS total_inscripciones
+    FROM Cursos C
+    LEFT JOIN Inscripciones I 
+        ON C.curso_id = I.curso_id
+        AND I.estado = 'activa'
+    GROUP BY C.nombre_curso
+    ORDER BY total_inscripciones DESC;
+END;
+
+CREATE PROCEDURE ProcesoEntero
+(
+    @estudiante_id INT,
+    @curso_id INT,
+    @calificacion DECIMAL(5,2),
+    @comentarios VARCHAR(MAX),
+    @metodo_id INT,
+    @referencia_pago VARCHAR(100)
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        BEGIN TRAN;
+
+        DECLARE @cupo_max INT, @inscritos INT, @costo DECIMAL(10,2),
+                @inscripcion_id INT, @pago_id INT;
+
+        SELECT @cupo_max = cupo_maximo, @costo = costo
+        FROM Cursos WHERE curso_id = @curso_id;
+
+        IF @cupo_max IS NULL
+            RAISERROR('Curso no existe',16,1);
+
+        SELECT @inscritos = COUNT(*)
+        FROM Inscripciones
+        WHERE curso_id = @curso_id AND estado = 'activa';
+
+        IF @inscritos >= @cupo_max
+            RAISERROR('El curso ya está lleno',16,1);
+
+        INSERT INTO Inscripciones
+        VALUES (@estudiante_id, @curso_id, GETDATE(), 'activa', @costo);
+
+        SET @inscripcion_id = SCOPE_IDENTITY();
+
+        INSERT INTO Evaluaciones
+        VALUES (@inscripcion_id, @calificacion,
+        ENCRYPTBYPASSPHRASE('clave123', @comentarios), GETDATE());
+
+        INSERT INTO Pagos
+        VALUES (@inscripcion_id, GETDATE(), @metodo_id,
+        ENCRYPTBYPASSPHRASE('clave123', @referencia_pago), @costo);
+
+        SET @pago_id = SCOPE_IDENTITY();
+
+        INSERT INTO Detalle_Pago
+        VALUES (@pago_id, 'Pago de curso', 1, @costo);
+
+        COMMIT;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK;
+        PRINT ERROR_MESSAGE();
+    END CATCH
+END;
+
+--INSERTS DE PRUEBA
+
+-- Cursos
+INSERT INTO Cursos (nombre_curso, categoria, cupo_maximo, duracion_horas, costo, estado)
+VALUES
+('SQL Básico', 'Programación', 2, 20, 1500, 'activo'),
+('Redes', 'Tecnología', 3, 30, 2000, 'activo');
+
+--Estudiantes
+INSERT INTO Estudiantes 
+(nombre_completo, email, telefono, direccion, tipo_documento, numero_documento)
+VALUES
+('Luis Martinez',
+ ENCRYPTBYPASSPHRASE('clave123','luis@mail.com'),
+ '1234567890','CDMX','INE',
+ ENCRYPTBYPASSPHRASE('clave123','ABC001')),
+
+('Sofia Hernandez',
+ ENCRYPTBYPASSPHRASE('clave123','sofia@mail.com'),
+ '1234567891','CDMX','INE',
+ ENCRYPTBYPASSPHRASE('clave123','ABC002')),
+
+('Diego Ramirez',
+ ENCRYPTBYPASSPHRASE('clave123','diego@mail.com'),
+ '1234567892','CDMX','INE',
+ ENCRYPTBYPASSPHRASE('clave123','ABC003'));
+
+INSERT INTO Inscripciones (estudiante_id, curso_id, estado, total_pago)
+VALUES
+(1, 1, 'activa', 1500),
+(2, 1, 'activa', 1500);
+
+
+INSERT INTO Inscripciones (estudiante_id, curso_id, estado, total_pago)
+VALUES (3, 1, 'activa', 1500);
+
+INSERT INTO Evaluaciones (inscripcion_id, calificacion, comentarios)
+VALUES
+(3, 9.5, ENCRYPTBYPASSPHRASE('clave123','Excelente alumno'));
+
+--Probar Procedimientos 
+
+EXEC ProcesoEntero
+    @estudiante_id = 4,
+    @curso_id = 2,
+    @calificacion = 10.0,
+    @comentarios = 'Excelente desempeño',
+    @metodo_id = 1,
+    @referencia_pago = 'REF123';
+
+EXEC RegistrarEstudiante
+    @nombre_completo = 'Carlos Lopez',
+    @email = 'carlos@mail.com',
+    @telefono = '5512345678',
+    @direccion = 'CDMX',
+    @tipo_documento = 'INE',
+    @numero_documento = 'ABC999';
+
+EXEC CursoDemanda;
+
+EXEC RegistrarInscripcion
+    @estudiante_id = 1,
+    @curso_id = 2;
+
+EXEC RegistrarEvaluacion
+    @inscripcion_id = 3,
+    @calificacion = 7.5,
+    @comentarios = 'Puede mejorar';
+
+SELECT * FROM Cursos
+SELECT * FROM Estudiantes
+SELECT * FROM Inscripciones
+select * from Instructores
+
+INSERT INTO Instructores 
+(nombre_completo, especialidad, cedula_profesional, usuario, contrasena, estado)
+VALUES 
+(
+    'María García Ruiz',
+    'Redes',
+    ENCRYPTBYPASSPHRASE('clave123', '9876543210'),
+    'mariag',
+    ENCRYPTBYPASSPHRASE('clave123', 'maria123'),
+    'activo'
+),
+(
+    'Carlos Hernández Soto',
+    'Seguridad Informática',
+    ENCRYPTBYPASSPHRASE('clave123', '4561237890'),
+    'carlosh',
+    ENCRYPTBYPASSPHRASE('clave123', 'seguro456'),
+    'activo'
+);
+
+
+select * from Evaluaciones
+select * from Estudiantes
+select * from Instructores
+select * from Inscripciones
+select * from Evaluaciones_Upd
+select * from Pagos
+select * from Cursos;
+select * from Curso_Instructor;
+
+
+IF OBJECT_ID('dbo.Entregables', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Entregables
+    (
+        entregable_id            INT IDENTITY(1,1) NOT NULL,
+        curso_id                 INT NOT NULL,
+        instructor_id            INT NOT NULL,
+        titulo                   NVARCHAR(150) NOT NULL,
+        descripcion              NVARCHAR(MAX) NULL,
+        fecha_publicacion        DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregables_fecha_publicacion DEFAULT SYSDATETIME(),
+        fecha_limite             DATETIME2(0) NOT NULL,
+        permite_entrega_tardia   BIT NOT NULL
+            CONSTRAINT DF_Entregables_permite_tardia DEFAULT (0),
+        puntaje_maximo           DECIMAL(7,2) NOT NULL
+            CONSTRAINT DF_Entregables_puntaje_maximo DEFAULT (100.00),
+        estado                   NVARCHAR(20) NOT NULL
+            CONSTRAINT DF_Entregables_estado DEFAULT (N'publicado'),
+        archivo_guia_ruta        NVARCHAR(500) NULL, -- opcional: archivo guía del instructor
+        fecha_creacion           DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregables_fecha_creacion DEFAULT SYSDATETIME(),
+        fecha_actualizacion      DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregables_fecha_actualizacion DEFAULT SYSDATETIME(),
+
+        CONSTRAINT PK_Entregables PRIMARY KEY CLUSTERED (entregable_id),
+
+        CONSTRAINT CK_Entregables_estado
+            CHECK (estado IN (N'borrador', N'publicado', N'cerrado', N'cancelado')),
+
+        CONSTRAINT CK_Entregables_puntaje_maximo
+            CHECK (puntaje_maximo > 0),
+
+        CONSTRAINT CK_Entregables_fechas
+            CHECK (fecha_limite >= fecha_publicacion),
+
+     
+        CONSTRAINT FK_Entregables_CursoInstructor
+            FOREIGN KEY (curso_id, instructor_id)
+            REFERENCES dbo.Curso_Instructor (curso_id, instructor_id)
+    );
+END
+
+
+IF OBJECT_ID('dbo.Entregas', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Entregas
+    (
+        entrega_id                 INT IDENTITY(1,1) NOT NULL,
+        entregable_id              INT NOT NULL,
+        estudiante_id              INT NOT NULL,
+
+        fecha_entrega              DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregas_fecha_entrega DEFAULT SYSDATETIME(),
+
+        estado_entrega             NVARCHAR(20) NOT NULL
+            CONSTRAINT DF_Entregas_estado DEFAULT (N'enviada'),
+
+        archivo_ruta               NVARCHAR(500) NOT NULL,
+        archivo_nombre_original    NVARCHAR(260) NOT NULL,
+        archivo_extension          NVARCHAR(20) NULL,
+        archivo_mime               NVARCHAR(120) NULL,
+        archivo_tamano_bytes       BIGINT NULL,
+
+        observaciones_estudiante   NVARCHAR(MAX) NULL,
+
+
+        calificacion               DECIMAL(5,2) NULL,  
+        puntaje_obtenido           DECIMAL(7,2) NULL,     
+        retroalimentacion          NVARCHAR(MAX) NULL,
+        instructor_calificador_id  INT NULL,
+        fecha_calificacion         DATETIME2(0) NULL,
+
+        fecha_creacion             DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregas_fecha_creacion DEFAULT SYSDATETIME(),
+        fecha_actualizacion        DATETIME2(0) NOT NULL
+            CONSTRAINT DF_Entregas_fecha_actualizacion DEFAULT SYSDATETIME(),
+
+        CONSTRAINT PK_Entregas PRIMARY KEY CLUSTERED (entrega_id),
+
+        
+        CONSTRAINT UQ_Entregas_Entregable_Estudiante
+            UNIQUE (entregable_id, estudiante_id),
+
+        CONSTRAINT CK_Entregas_estado
+            CHECK (estado_entrega IN (N'enviada', N'tarde', N'calificada', N'revisar')),
+
+        CONSTRAINT CK_Entregas_calificacion
+            CHECK (calificacion IS NULL OR (calificacion >= 0 AND calificacion <= 100)),
+
+        CONSTRAINT CK_Entregas_puntaje
+            CHECK (puntaje_obtenido IS NULL OR puntaje_obtenido >= 0),
+
+        CONSTRAINT CK_Entregas_tamano
+            CHECK (archivo_tamano_bytes IS NULL OR archivo_tamano_bytes > 0),
+
+        CONSTRAINT FK_Entregas_Entregables
+            FOREIGN KEY (entregable_id)
+            REFERENCES dbo.Entregables (entregable_id)
+            ON DELETE CASCADE,
+
+        CONSTRAINT FK_Entregas_Estudiantes
+            FOREIGN KEY (estudiante_id)
+            REFERENCES dbo.Estudiantes (estudiante_id),
+
+        CONSTRAINT FK_Entregas_Instructores_Calificador
+            FOREIGN KEY (instructor_calificador_id)
+            REFERENCES dbo.Instructores (instructor_id)
+    );
+END
+
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_Entregables_Instructor_Estado_FechaLimite'
+      AND object_id = OBJECT_ID('dbo.Entregables')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_Entregables_Instructor_Estado_FechaLimite
+    ON dbo.Entregables (instructor_id, estado, fecha_limite DESC);
+END
+
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_Entregables_Curso_Estado'
+      AND object_id = OBJECT_ID('dbo.Entregables')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_Entregables_Curso_Estado
+    ON dbo.Entregables (curso_id, estado);
+END
+
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_Entregas_Entregable_Estado_Fecha'
+      AND object_id = OBJECT_ID('dbo.Entregas')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_Entregas_Entregable_Estado_Fecha
+    ON dbo.Entregas (entregable_id, estado_entrega, fecha_entrega DESC);
+END
+
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_Entregas_Estudiante_Fecha'
+      AND object_id = OBJECT_ID('dbo.Entregas')
+)
+BEGIN
+    CREATE NONCLUSTERED INDEX IX_Entregas_Estudiante_Fecha
+    ON dbo.Entregas (estudiante_id, fecha_entrega DESC);
+END
