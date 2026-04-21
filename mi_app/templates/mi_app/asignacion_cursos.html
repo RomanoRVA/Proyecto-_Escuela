@@ -1,0 +1,191 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Asignación de Cursos a Profesores</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="/admin-dashboard/">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/" class="active">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Asignar Cursos a Profesores</h2>
+
+        <div class="form-container" style="display:block;">
+            <h3 style="margin-bottom: 18px;">Nueva Asignación</h3>
+            <div class="form-grid">
+                <select id="curso_id">
+                    <option value="">Seleccionar Curso</option>
+                </select>
+                <select id="instructor_id">
+                    <option value="">Seleccionar Profesor</option>
+                </select>
+            </div>
+            <div style="margin-top: 14px; display:flex; gap:10px;">
+                <button class="btn btn-primary" onclick="crearAsignacion()">Asignar Curso</button>
+                <button class="btn btn-secondary" onclick="cargarDatos()">Recargar</button>
+            </div>
+        </div>
+
+        <div class="table-container" style="margin-top:20px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Profesor</th>
+                        <th>Especialidad</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-asignaciones">
+                    <tr><td colspan="4" style="text-align:center;">Cargando asignaciones...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function verificarAdmin() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'admin') {
+                window.location.href = '/';
+                return false;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        async function cargarDatos() {
+            try {
+                const [cursos, instructores, asignaciones] = await Promise.all([
+                    fetch('/api/cursos/').then(r => r.json()),
+                    fetch('/api/instructores/').then(r => r.json()),
+                    fetch('/api/curso-instructor/').then(r => r.json())
+                ]);
+
+                const cursoSelect = document.getElementById('curso_id');
+                cursoSelect.innerHTML = '<option value="">Seleccionar Curso</option>';
+                (Array.isArray(cursos) ? cursos : []).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.curso_id;
+                    option.textContent = c.nombre_curso;
+                    cursoSelect.appendChild(option);
+                });
+
+                const instructorSelect = document.getElementById('instructor_id');
+                instructorSelect.innerHTML = '<option value="">Seleccionar Profesor</option>';
+                (Array.isArray(instructores) ? instructores : []).forEach(i => {
+                    const option = document.createElement('option');
+                    option.value = i.instructor_id;
+                    option.textContent = i.nombre_completo;
+                    instructorSelect.appendChild(option);
+                });
+
+                const tbody = document.getElementById('tbody-asignaciones');
+                if (!Array.isArray(asignaciones) || asignaciones.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay asignaciones registradas</td></tr>';
+                } else {
+                    tbody.innerHTML = asignaciones.map(a => `
+                        <tr>
+                            <td>${a.nombre_curso}</td>
+                            <td>${a.nombre_instructor}</td>
+                            <td>${a.especialidad || 'N/A'}</td>
+                            <td>
+                                <button class="btn btn-delete" onclick="eliminarAsignacion(${a.asignacion_id}, '${(a.nombre_curso || '').replace(/'/g, "\\'")}', '${(a.nombre_instructor || '').replace(/'/g, "\\'")}')">Quitar</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                document.getElementById('tbody-asignaciones').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#e74c3c;">Error cargando asignaciones</td></tr>';
+            }
+        }
+
+        async function eliminarAsignacion(asignacionId, nombreCurso, nombreInstructor) {
+            const confirmado = confirm(`¿Quitar a ${nombreInstructor} del curso ${nombreCurso}?`);
+            if (!confirmado) return;
+
+            try {
+                const response = await fetch('/api/desasignar-curso-instructor/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ asignacion_id: asignacionId })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No fue posible eliminar la asignación'));
+                    return;
+                }
+
+                alert('Asignación eliminada correctamente');
+                await cargarDatos();
+            } catch (error) {
+                alert('Error de conexión al eliminar la asignación');
+            }
+        }
+
+        async function crearAsignacion() {
+            const cursoId = document.getElementById('curso_id').value;
+            const instructorId = document.getElementById('instructor_id').value;
+
+            if (!cursoId || !instructorId) {
+                alert('Selecciona un curso y un profesor');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/asignar-curso-instructor/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ curso_id: cursoId, instructor_id: instructorId })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No fue posible crear la asignación'));
+                    return;
+                }
+
+                alert('Asignación creada correctamente');
+                document.getElementById('curso_id').value = '';
+                document.getElementById('instructor_id').value = '';
+                await cargarDatos();
+            } catch (error) {
+                alert('Error de conexión al asignar curso');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarAdmin()) {
+                cargarDatos();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

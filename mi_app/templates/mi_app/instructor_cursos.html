@@ -1,0 +1,656 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Cursos - Instructor</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+    <style>
+        .cursos-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .curso-card {
+            display: grid;
+            grid-template-columns: 12px 1fr;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(15, 42, 61, 0.14);
+            border-radius: 10px;
+            box-shadow: 0 10px 24px rgba(12, 42, 58, 0.11);
+            overflow: hidden;
+        }
+
+        .curso-accent {
+            background: var(--accent-color, #3ac4de);
+        }
+
+        .curso-content {
+            padding: 16px 18px;
+        }
+
+        .curso-codigo {
+            color: #647887;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .curso-titulo {
+            color: #233744;
+            font-size: 30px;
+            margin-top: 4px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .curso-meta {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            color: #4c6272;
+            font-size: 14px;
+        }
+
+        .separador {
+            opacity: 0.45;
+        }
+
+        .entregables-box {
+            margin-top: 14px;
+            border: 1px solid rgba(15, 42, 61, 0.12);
+            border-radius: 8px;
+            background: #f8fafc;
+            overflow: hidden;
+        }
+
+        .entregables-toggle {
+            width: 100%;
+            border: none;
+            padding: 13px 14px;
+            background: #eef3f7;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #1e3244;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .entregables-toggle:hover {
+            background: #e7edf4;
+        }
+
+        .chevron {
+            transition: transform 0.2s ease;
+        }
+
+        .entregables-toggle.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        .entregables-content {
+            display: none;
+            padding: 12px;
+            border-top: 1px solid rgba(15, 42, 61, 0.12);
+        }
+
+        .entregables-content.open {
+            display: block;
+        }
+
+        .crear-entregable {
+            background: #fff;
+            border: 1px solid rgba(15, 42, 61, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .crear-entregable h4 {
+            margin: 0 0 10px;
+            color: #1f3446;
+        }
+
+        .entregable-item {
+            background: #fff;
+            border: 1px solid rgba(15, 42, 61, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .entregable-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .entregable-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .entregable-titulo {
+            font-weight: 700;
+            color: #1f3242;
+        }
+
+        .entregable-info {
+            font-size: 14px;
+            color: #4d6373;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .entregas-panel {
+            margin-top: 10px;
+            border-top: 1px dashed rgba(15, 42, 61, 0.2);
+            padding-top: 10px;
+            display: none;
+        }
+
+        .entregas-panel.open {
+            display: block;
+        }
+
+        .entrega-row {
+            border: 1px solid rgba(15, 42, 61, 0.1);
+            border-radius: 8px;
+            padding: 9px;
+            margin-bottom: 8px;
+            background: #fdfefe;
+        }
+
+        .entrega-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .entrega-meta {
+            font-size: 13px;
+            color: #4a6171;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .entrega-actions {
+            margin-top: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .texto-vacio {
+            text-align: center;
+            color: #5b7384;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Mis Cursos</h1>
+        <div class="nav-links">
+            <a href="/instructor-dashboard/">Menú</a>
+            <a href="/instructor-cursos/" class="active">Cursos</a>
+            <a href="/instructor-alumnos/">Alumnos</a>
+            <a href="/instructor-calificaciones/">Calificaciones</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Cursos Asignados y Entregables</h2>
+        <div id="message" class="message"></div>
+        <div id="contenedor-cursos" class="cursos-stack">
+            <div class="table-container" style="padding: 20px; text-align:center;">Cargando cursos...</div>
+        </div>
+    </div>
+
+    <script>
+        let instructorId = null;
+        const ACCENT_COLORS = ['#69d2c1', '#74d76f', '#3ac4de', '#f35a95', '#7cdaea', '#f5b544'];
+
+        function verificarInstructor() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'instructor') {
+                window.location.href = '/';
+                return false;
+            }
+            instructorId = user.id;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const msg = document.getElementById('message');
+            msg.textContent = texto;
+            msg.className = `message ${tipo}`;
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 4500);
+        }
+
+        function escapeHtml(texto) {
+            return String(texto || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function formatFecha(valor) {
+            if (!valor) return '-';
+            const fecha = new Date(valor);
+            if (Number.isNaN(fecha.getTime())) return valor;
+            return fecha.toLocaleString();
+        }
+
+        function badgeEstado(valor) {
+            const estado = (valor || '').toLowerCase();
+            return `<span class="badge badge-${escapeHtml(estado)}">${escapeHtml(valor || '-')}</span>`;
+        }
+
+        function toggleEntregables(cursoId) {
+            const content = document.getElementById(`entregables-content-${cursoId}`);
+            const btn = document.getElementById(`entregables-toggle-${cursoId}`);
+            if (!content || !btn) return;
+            content.classList.toggle('open');
+            btn.classList.toggle('open');
+        }
+
+        function toggleEntregasPanel(entregableId) {
+            const panel = document.getElementById(`entregas-panel-${entregableId}`);
+            if (!panel) return;
+            panel.classList.toggle('open');
+        }
+
+        async function crearEntregableCurso(cursoId) {
+            const tituloEl = document.getElementById(`titulo-${cursoId}`);
+            const descEl = document.getElementById(`descripcion-${cursoId}`);
+            const fechaEl = document.getElementById(`fecha_limite-${cursoId}`);
+            const puntajeEl = document.getElementById(`puntaje_maximo-${cursoId}`);
+            const tardiaEl = document.getElementById(`permite_tardia-${cursoId}`);
+
+            const titulo = tituloEl.value.trim();
+            const descripcion = descEl.value.trim();
+            const fecha_limite_local = fechaEl.value;
+            const puntaje_maximo = puntajeEl.value;
+            const permite_entrega_tardia = tardiaEl.value === 'true';
+
+            if (!titulo || !fecha_limite_local || !puntaje_maximo) {
+                mostrarMensaje('Completa título, fecha límite y puntaje', 'error');
+                return;
+            }
+
+            const fecha_limite = `${fecha_limite_local}:00`;
+
+            try {
+                const response = await fetch('/api/entregables/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        curso_id: cursoId,
+                        titulo,
+                        descripcion,
+                        fecha_limite,
+                        puntaje_maximo,
+                        permite_entrega_tardia
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarMensaje('Entregable creado correctamente', 'success');
+                    tituloEl.value = '';
+                    descEl.value = '';
+                    fechaEl.value = '';
+                    puntajeEl.value = '100';
+                    tardiaEl.value = 'false';
+                    await cargarCursosInstructor();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo crear el entregable', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al crear entregable', 'error');
+            }
+        }
+
+        function toLocalDateTimeInputValue(valor) {
+            if (!valor) return '';
+            const fecha = new Date(valor);
+            if (Number.isNaN(fecha.getTime())) return '';
+            const year = fecha.getFullYear();
+            const month = String(fecha.getMonth() + 1).padStart(2, '0');
+            const day = String(fecha.getDate()).padStart(2, '0');
+            const hours = String(fecha.getHours()).padStart(2, '0');
+            const minutes = String(fecha.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        async function editarEntregable(entregableId) {
+            const response = await fetch(`/api/entregables/instructor/?instructor_id=${instructorId}`);
+            const data = await response.json();
+            if (!Array.isArray(data)) {
+                mostrarMensaje('No se pudo obtener el entregable a editar', 'error');
+                return;
+            }
+
+            const item = data.find(d => Number(d.entregable_id) === Number(entregableId));
+            if (!item) {
+                mostrarMensaje('Entregable no encontrado', 'error');
+                return;
+            }
+
+            const nuevoTitulo = prompt('Nuevo título:', item.titulo || '');
+            if (nuevoTitulo === null) return;
+            const titulo = nuevoTitulo.trim();
+            if (!titulo) {
+                mostrarMensaje('El título no puede estar vacío', 'error');
+                return;
+            }
+
+            const nuevaDescripcion = prompt('Nueva descripción:', item.descripcion || '');
+            if (nuevaDescripcion === null) return;
+
+            const fechaSugerida = toLocalDateTimeInputValue(item.fecha_limite);
+            const nuevaFecha = prompt('Nueva fecha límite (YYYY-MM-DDTHH:mm):', fechaSugerida);
+            if (nuevaFecha === null) return;
+            if (!nuevaFecha.trim()) {
+                mostrarMensaje('La fecha límite es requerida', 'error');
+                return;
+            }
+
+            const nuevoPuntaje = prompt('Nuevo puntaje máximo:', String(item.puntaje_maximo ?? '100'));
+            if (nuevoPuntaje === null) return;
+            const puntaje = parseFloat(nuevoPuntaje);
+            if (Number.isNaN(puntaje) || puntaje <= 0) {
+                mostrarMensaje('Puntaje máximo inválido', 'error');
+                return;
+            }
+
+            const permiteActual = item.permite_entrega_tardia ? 'si' : 'no';
+            const nuevaTardia = prompt('¿Permitir entrega tardía? (si/no):', permiteActual);
+            if (nuevaTardia === null) return;
+            const permite = ['si', 'sí', 's', 'true', '1', 'yes'].includes(nuevaTardia.trim().toLowerCase());
+
+            try {
+                const updateResponse = await fetch('/api/entregables/update/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        entregable_id: entregableId,
+                        titulo,
+                        descripcion: nuevaDescripcion,
+                        fecha_limite: `${nuevaFecha}:00`,
+                        puntaje_maximo: puntaje,
+                        permite_entrega_tardia: permite
+                    })
+                });
+                const result = await updateResponse.json();
+                if (result.success) {
+                    mostrarMensaje('Entregable actualizado correctamente', 'success');
+                    await cargarCursosInstructor();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo actualizar el entregable', 'error');
+                }
+            } catch (_error) {
+                mostrarMensaje('Error de conexión al actualizar entregable', 'error');
+            }
+        }
+
+        async function eliminarEntregable(entregableId, titulo) {
+            const ok = confirm(`¿Seguro que quieres eliminar el entregable "${titulo}"?`);
+            if (!ok) return;
+
+            try {
+                const response = await fetch('/api/entregables/delete/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        entregable_id: entregableId
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    mostrarMensaje('Entregable eliminado correctamente', 'success');
+                    await cargarCursosInstructor();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo eliminar el entregable', 'error');
+                }
+            } catch (_error) {
+                mostrarMensaje('Error de conexión al eliminar entregable', 'error');
+            }
+        }
+
+        async function verEntregas(entregableId) {
+            const body = document.getElementById(`entregas-body-${entregableId}`);
+            const panel = document.getElementById(`entregas-panel-${entregableId}`);
+            if (!body || !panel) return;
+
+            panel.classList.add('open');
+            body.innerHTML = '<div class="texto-vacio">Cargando entregas...</div>';
+
+            try {
+                const data = await fetch(`/api/entregas/por-entregable/?instructor_id=${instructorId}&entregable_id=${entregableId}`).then(r => r.json());
+                if (!Array.isArray(data) || data.length === 0) {
+                    body.innerHTML = '<div class="texto-vacio">Aún no hay entregas para esta tarea.</div>';
+                    return;
+                }
+
+                body.innerHTML = data.map(item => {
+                    const archivoLink = item.archivo_ruta
+                        ? `<a href="/media/${item.archivo_ruta}" target="_blank" rel="noopener">${escapeHtml(item.archivo_nombre_original || 'Ver archivo')}</a>`
+                        : 'Sin archivo';
+                    const calif = (item.calificacion !== null && item.calificacion !== undefined) ? item.calificacion : '-';
+
+                    return `
+                        <div class="entrega-row">
+                            <div class="entrega-top">
+                                <strong>${escapeHtml(item.nombre_estudiante || 'Estudiante')}</strong>
+                                ${badgeEstado(item.estado_entrega)}
+                            </div>
+                            <div class="entrega-meta">
+                                <span>Fecha: ${escapeHtml(formatFecha(item.fecha_entrega))}</span>
+                                <span class="separador">|</span>
+                                <span>Calificación: ${escapeHtml(String(calif))}</span>
+                                <span class="separador">|</span>
+                                <span>${archivoLink}</span>
+                            </div>
+                            <div class="entrega-actions">
+                                <button class="btn btn-primary" onclick="calificarEntrega(${item.entrega_id})">Calificar</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                body.innerHTML = '<div class="texto-vacio" style="color:#dc2626;">Error cargando entregas.</div>';
+            }
+        }
+
+        async function calificarEntrega(entregaId) {
+            const calificacion = prompt('Calificación (0-100):', '');
+            if (calificacion === null) return;
+
+            const calNum = parseFloat(calificacion);
+            if (Number.isNaN(calNum) || calNum < 0 || calNum > 100) {
+                mostrarMensaje('La calificación debe estar entre 0 y 100', 'error');
+                return;
+            }
+
+            const retroalimentacion = prompt('Retroalimentación:', '') || '';
+
+            try {
+                const response = await fetch('/api/entregas/calificar/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        entrega_id: entregaId,
+                        calificacion: calNum,
+                        retroalimentacion
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    mostrarMensaje('Entrega calificada correctamente', 'success');
+                    await cargarCursosInstructor();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo calificar', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al calificar', 'error');
+            }
+        }
+
+        function renderEntregablesCurso(cursoId, entregables) {
+            if (!Array.isArray(entregables) || entregables.length === 0) {
+                return '<div class="texto-vacio">No hay entregables creados para este curso.</div>';
+            }
+
+            return entregables.map(item => {
+                const puntaje = (item.puntaje_maximo !== null && item.puntaje_maximo !== undefined)
+                    ? Number(item.puntaje_maximo).toFixed(2)
+                    : '-';
+
+                return `
+                    <div class="entregable-item">
+                        <div class="entregable-head">
+                            <div class="entregable-titulo">${escapeHtml(item.titulo)}</div>
+                            ${badgeEstado(item.estado)}
+                        </div>
+                        <div class="entregable-info">
+                            <span>Límite: ${escapeHtml(formatFecha(item.fecha_limite))}</span>
+                            <span class="separador">|</span>
+                            <span>Puntaje: ${escapeHtml(puntaje)}</span>
+                        </div>
+                        <div class="entrega-actions">
+                            <button class="btn btn-edit" onclick="toggleEntregasPanel(${item.entregable_id})">Mostrar/Ocultar Entregas</button>
+                            <button class="btn btn-primary" onclick="verEntregas(${item.entregable_id})">Actualizar Entregas</button>
+                            <button class="btn btn-edit" onclick="editarEntregable(${item.entregable_id})">Editar</button>
+                            <button class="btn btn-delete" onclick="eliminarEntregable(${item.entregable_id}, '${escapeHtml(item.titulo).replace(/'/g, "\\'")}')">Eliminar</button>
+                        </div>
+                        <div id="entregas-panel-${item.entregable_id}" class="entregas-panel">
+                            <div id="entregas-body-${item.entregable_id}" class="texto-vacio">Haz clic en "Actualizar Entregas" para cargar.</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function cargarCursosInstructor() {
+            try {
+                const [asignaciones, entregables] = await Promise.all([
+                    fetch('/api/curso-instructor/').then(r => r.json()),
+                    fetch(`/api/entregables/instructor/?instructor_id=${instructorId}`).then(r => r.json())
+                ]);
+
+                const misCursos = Array.isArray(asignaciones)
+                    ? asignaciones.filter(item => Number(item.instructor_id) === Number(instructorId))
+                    : [];
+
+                const contenedor = document.getElementById('contenedor-cursos');
+                if (misCursos.length === 0) {
+                    contenedor.innerHTML = '<div class="table-container" style="padding: 20px; text-align:center;">No hay cursos asignados</div>';
+                    return;
+                }
+
+                const entregablesPorCurso = {};
+                if (Array.isArray(entregables)) {
+                    entregables.forEach(item => {
+                        const key = String(item.curso_id);
+                        if (!entregablesPorCurso[key]) {
+                            entregablesPorCurso[key] = [];
+                        }
+                        entregablesPorCurso[key].push(item);
+                    });
+                }
+
+                contenedor.innerHTML = misCursos.map((curso, index) => {
+                    const cursoId = curso.curso_id;
+                    const key = String(cursoId);
+                    const color = ACCENT_COLORS[index % ACCENT_COLORS.length];
+                    const listaEntregables = entregablesPorCurso[key] || [];
+
+                    return `
+                        <div class="curso-card" style="--accent-color:${color};">
+                            <div class="curso-accent"></div>
+                            <div class="curso-content">
+                                <div class="curso-codigo">CURSO #${cursoId}</div>
+                                <div class="curso-titulo">${escapeHtml(curso.nombre_curso)}</div>
+                                <div class="curso-meta">
+                                    <span>Instructor: ${escapeHtml(curso.nombre_instructor || '')}</span>
+                                    <span class="separador">|</span>
+                                    <span>Especialidad: ${escapeHtml(curso.especialidad || 'General')}</span>
+                                </div>
+
+                                <div class="entregables-box">
+                                    <button id="entregables-toggle-${cursoId}" class="entregables-toggle" onclick="toggleEntregables(${cursoId})">
+                                        <span>Entregables del Curso (${listaEntregables.length})</span>
+                                        <span class="chevron">▼</span>
+                                    </button>
+                                    <div id="entregables-content-${cursoId}" class="entregables-content">
+                                        <div class="crear-entregable">
+                                            <h4>Crear nuevo entregable</h4>
+                                            <div class="form-grid">
+                                                <input id="titulo-${cursoId}" type="text" placeholder="Título del entregable">
+                                                <input id="fecha_limite-${cursoId}" type="datetime-local">
+                                                <input id="puntaje_maximo-${cursoId}" type="number" step="0.01" min="1" value="100" placeholder="Puntaje máximo">
+                                                <select id="permite_tardia-${cursoId}">
+                                                    <option value="false">No permitir entrega tardía</option>
+                                                    <option value="true">Permitir entrega tardía</option>
+                                                </select>
+                                                <textarea id="descripcion-${cursoId}" rows="2" placeholder="Descripción"></textarea>
+                                            </div>
+                                            <div class="entrega-actions">
+                                                <button class="btn btn-primary" onclick="crearEntregableCurso(${cursoId})">Guardar Entregable</button>
+                                            </div>
+                                        </div>
+
+                                        ${renderEntregablesCurso(cursoId, listaEntregables)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                document.getElementById('contenedor-cursos').innerHTML = '<div class="table-container" style="padding: 20px; text-align:center; color:#dc2626;">Error cargando cursos</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (verificarInstructor()) {
+                cargarCursosInstructor();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,71 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Perfil - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/">Menú</a>
+            <a href="/estudiante-mis-cursos/">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/">Calificaciones</a>
+            <a href="/estudiante-inscripcion/">Inscripción</a>
+            <a href="/estudiante-perfil/" class="active">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Mi Perfil</h2>
+        <div class="info-section">
+            <div id="perfil-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let usuarioData = {};
+
+        function verificarEstudiante() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'estudiante') {
+                window.location.href = '/';
+                return false;
+            }
+            usuarioData = user;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function cargarPerfil() {
+            const perfilHTML = `
+                <p><strong>Nombre:</strong> ${usuarioData.nombre}</p>
+                <p><strong>Rol:</strong> Estudiante</p>
+                <p><strong>ID:</strong> ${usuarioData.id}</p>
+                <p style="color: #7f8c8d; margin-top: 15px;">Si deseas actualizar información personal, solicita el cambio al administrador.</p>
+            `;
+            document.getElementById('perfil-content').innerHTML = perfilHTML;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarEstudiante()) {
+                cargarPerfil();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

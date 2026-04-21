@@ -1,0 +1,228 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Entregables - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/">Menú</a>
+            <a href="/estudiante-mis-cursos/">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/">Calificaciones</a>
+            <a href="/estudiante-entregables/" class="active">Entregables</a>
+            <a href="/estudiante-inscripcion/">Inscripción</a>
+            <a href="/estudiante-perfil/">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Mis Entregables</h2>
+
+        <div id="message" class="message"></div>
+
+        <div class="table-container" style="margin-bottom: 28px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Curso</th>
+                        <th>Título</th>
+                        <th>Fecha límite</th>
+                        <th>Estado entrega</th>
+                        <th>Calificación</th>
+                        <th>Archivo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-entregables">
+                    <tr><td colspan="8" style="text-align:center; padding:24px;">Cargando entregables...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="form-container" style="display:block;">
+            <h3 style="margin-bottom: 16px;">Subir Entrega</h3>
+            <div class="form-grid">
+                <input id="entregable_id" type="number" placeholder="ID del entregable" readonly>
+                <input id="entregable_titulo" type="text" placeholder="Entregable seleccionado" readonly>
+                <input id="archivo" type="file">
+                <textarea id="observaciones_estudiante" rows="3" placeholder="Observaciones (opcional)"></textarea>
+            </div>
+            <div style="margin-top: 14px; display:flex; gap:10px;">
+                <button class="btn btn-primary" onclick="subirEntrega()">Enviar Archivo</button>
+                <button class="btn btn-secondary" onclick="limpiarSeleccionEntrega()">Limpiar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let estudianteId = null;
+        const query = new URLSearchParams(window.location.search);
+        const filtroCursoId = query.get('curso_id');
+        const focoEntregableId = query.get('entregable_id');
+
+        function mostrarMensaje(texto, tipo) {
+            const msg = document.getElementById('message');
+            msg.textContent = texto;
+            msg.className = `message ${tipo}`;
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 4500);
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function verificarEstudiante() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'estudiante') {
+                window.location.href = '/';
+                return false;
+            }
+            estudianteId = user.id;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function formatearFecha(valor) {
+            if (!valor) return '-';
+            const fecha = new Date(valor);
+            if (Number.isNaN(fecha.getTime())) return valor;
+            return fecha.toLocaleString();
+        }
+
+        function badgeEstado(valor) {
+            const estado = (valor || '').toLowerCase();
+            return `<span class="badge badge-${estado}">${valor || '-'}</span>`;
+        }
+
+        function limpiarSeleccionEntrega() {
+            document.getElementById('entregable_id').value = '';
+            document.getElementById('entregable_titulo').value = '';
+            document.getElementById('archivo').value = '';
+            document.getElementById('observaciones_estudiante').value = '';
+        }
+
+        function seleccionarEntregable(entregableId, titulo) {
+            document.getElementById('entregable_id').value = entregableId;
+            document.getElementById('entregable_titulo').value = titulo;
+            window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        }
+
+        async function cargarEntregablesEstudiante() {
+            const tbody = document.getElementById('tbody-entregables');
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px;">Cargando...</td></tr>';
+
+            try {
+                const data = await fetch(`/api/entregables/estudiante/?estudiante_id=${estudianteId}`).then(r => r.json());
+                const dataFiltrada = Array.isArray(data)
+                    ? data.filter(item => !filtroCursoId || String(item.curso_id) === String(filtroCursoId))
+                    : [];
+
+                if (filtroCursoId) {
+                    document.querySelector('h2').textContent = `Mis Entregables - Curso #${filtroCursoId}`;
+                }
+
+                if (dataFiltrada.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:24px;">No tienes entregables asignados</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = dataFiltrada.map(item => {
+                    const nombreArchivo = item.archivo_nombre_original || '';
+                    const archivoLink = item.archivo_ruta
+                        ? `<a href="/media/${item.archivo_ruta}" target="_blank" rel="noopener">${nombreArchivo || 'Ver archivo'}</a>`
+                        : '-';
+                    const calif = item.calificacion !== null && item.calificacion !== undefined
+                        ? parseFloat(item.calificacion).toFixed(2)
+                        : '-';
+                    const estadoEntrega = item.estado_entrega || 'pendiente';
+
+                    return `
+                        <tr>
+                            <td>#${item.entregable_id}</td>
+                            <td>${item.nombre_curso || item.curso_id}</td>
+                            <td>${item.titulo}</td>
+                            <td>${formatearFecha(item.fecha_limite)}</td>
+                            <td>${badgeEstado(estadoEntrega)}</td>
+                            <td>${calif}</td>
+                            <td>${archivoLink}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-edit" onclick="seleccionarEntregable(${item.entregable_id}, '${item.titulo.replace(/'/g, "\\'")}')">Subir / Reemplazar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                if (focoEntregableId) {
+                    const tareaInicial = dataFiltrada.find(item => String(item.entregable_id) === String(focoEntregableId));
+                    if (tareaInicial) {
+                        seleccionarEntregable(tareaInicial.entregable_id, tareaInicial.titulo);
+                    }
+                }
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#dc2626; padding:24px;">Error cargando entregables</td></tr>';
+            }
+        }
+
+        async function subirEntrega() {
+            const entregable_id = document.getElementById('entregable_id').value;
+            const archivo = document.getElementById('archivo').files[0];
+            const observaciones_estudiante = document.getElementById('observaciones_estudiante').value.trim();
+
+            if (!entregable_id) {
+                mostrarMensaje('Selecciona un entregable en la tabla', 'error');
+                return;
+            }
+
+            if (!archivo) {
+                mostrarMensaje('Selecciona un archivo para enviar', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('entregable_id', entregable_id);
+            formData.append('estudiante_id', estudianteId);
+            formData.append('archivo', archivo);
+            formData.append('observaciones_estudiante', observaciones_estudiante);
+
+            try {
+                const response = await fetch('/api/entregas/upload/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarMensaje('Entrega subida correctamente', 'success');
+                    limpiarSeleccionEntrega();
+                    cargarEntregablesEstudiante();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo subir el archivo', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al subir la entrega', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!verificarEstudiante()) return;
+            await cargarEntregablesEstudiante();
+        });
+    </script>
+</body>
+</html>

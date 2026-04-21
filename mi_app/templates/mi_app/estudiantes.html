@@ -1,0 +1,374 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Estudiantes</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="javascript:void(0)" onclick="irAlDashboard()">Menú</a>
+            <a href="/estudiantes-page/" class="active">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Gestión de Estudiantes</h2>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleForm()">+ Agregar Estudiante</button>
+        </div>
+
+        <div class="form-container" id="form-container">
+            <h3 style="margin-bottom: 20px; color: #2c3e50;">Registrar Nuevo Estudiante</h3>
+            <div class="form-grid">
+                <input id="nombre" placeholder="Nombre Completo" type="text">
+                <input id="email" placeholder="Email" type="email">
+                <input id="telefono" placeholder="Teléfono" type="tel">
+                <input id="direccion" placeholder="Dirección" type="text">
+                <input id="usuario" placeholder="Usuario" type="text" autocomplete="off">
+                <input id="contrasena" placeholder="Contraseña" type="password" autocomplete="new-password">
+                <select id="tipo_doc">
+                    <option value="">Tipo de Documento</option>
+                    <option value="CC">Cédula de Ciudadanía</option>
+                    <option value="TI">Tarjeta de Identidad</option>
+                    <option value="PPT">Pasaporte</option>
+                </select>
+                <input id="numero_doc" placeholder="Número de Documento" type="text">
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="createEstudiante()">Guardar Estudiante</button>
+                <button class="btn btn-secondary" onclick="toggleForm()">Cancelar</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="estudiantesTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Usuario</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <th>Dirección</th>
+                        <th>Tipo Doc</th>
+                        <th>Número Doc</th>
+                        <th>Registro</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-estudiantes">
+                    <tr><td colspan="10" style="text-align: center; padding: 30px;">Cargando estudiantes...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal" id="edit-estudiante-modal">
+        <div class="modal-content">
+            <div class="modal-header">Editar Estudiante</div>
+            <input type="hidden" id="edit-estudiante-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="edit-nombre">Nombre Completo</label>
+                    <input id="edit-nombre" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-usuario">Usuario</label>
+                    <input id="edit-usuario" type="text" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="edit-email">Email</label>
+                    <input id="edit-email" type="email">
+                </div>
+                <div class="form-group">
+                    <label for="edit-telefono">Teléfono</label>
+                    <input id="edit-telefono" type="tel">
+                </div>
+                <div class="form-group">
+                    <label for="edit-direccion">Dirección</label>
+                    <input id="edit-direccion" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-tipo-doc">Tipo de Documento</label>
+                    <select id="edit-tipo-doc">
+                        <option value="CC">Cédula de Ciudadanía</option>
+                        <option value="TI">Tarjeta de Identidad</option>
+                        <option value="PPT">Pasaporte</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-numero-doc">Número de Documento</label>
+                    <input id="edit-numero-doc" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-contrasena">Nueva Contraseña (Opcional)</label>
+                    <input id="edit-contrasena" type="password" autocomplete="new-password" placeholder="Dejar vacío para no cambiar">
+                </div>
+            </div>
+            <div class="button-group" style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="cerrarEditarEstudianteModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="guardarEdicionEstudiante()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let estudiantesActuales = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarUsuario();
+            ajustarNavegacionInstructor();
+            cargarEstudiantes();
+        });
+
+        function verificarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role === 'instructor') {
+                alert('Los instructores no tienen acceso a la gestión de estudiantes.');
+                window.location.href = '/instructor-dashboard/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+        }
+
+        function ajustarNavegacionInstructor() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'instructor') {
+                document.querySelectorAll('a[href="/inscripciones-page/"], a[href="/reportes-page/"]').forEach(el => el.remove());
+            }
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function irAlDashboard() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'admin') {
+                window.location.href = '/admin-dashboard/';
+            } else if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+            } else if (user.role === 'estudiante') {
+                window.location.href = '/estudiante-dashboard/';
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        function toggleForm() {
+            document.getElementById('form-container').classList.toggle('show');
+        }
+
+        async function cargarEstudiantes() {
+            try {
+                const response = await fetch('/api/estudiantes/');
+                const estudiantes = await response.json();
+                const tbody = document.getElementById('tbody-estudiantes');
+                estudiantesActuales = Array.isArray(estudiantes) ? estudiantes : [];
+                
+                if (estudiantesActuales.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 30px;">No hay estudiantes registrados</td></tr>';
+                } else {
+                    tbody.innerHTML = estudiantesActuales.map(e => `
+                        <tr>
+                            <td>#${e.estudiante_id}</td>
+                            <td><strong>${e.nombre_completo}</strong></td>
+                            <td>${e.usuario || 'N/A'}</td>
+                            <td>${e.email}</td>
+                            <td>${e.telefono || 'N/A'}</td>
+                            <td>${e.direccion || 'N/A'}</td>
+                            <td>${e.tipo_documento}</td>
+                            <td>${e.numero_documento}</td>
+                            <td>${new Date(e.fecha_registro).toLocaleDateString()}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-primary" style="padding:6px 10px;" onclick="editarEstudiante(${e.estudiante_id})">Editar</button>
+                                    <button class="btn btn-secondary" style="padding:6px 10px;" onclick="eliminarEstudiante(${e.estudiante_id})">Eliminar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('tbody-estudiantes').innerHTML = '<tr><td colspan="10" style="text-align: center; color: red;">Error cargando estudiantes</td></tr>';
+            }
+        }
+
+        async function editarEstudiante(estudianteId) {
+            const actual = estudiantesActuales.find(e => e.estudiante_id === estudianteId);
+            if (!actual) return;
+
+            document.getElementById('edit-estudiante-id').value = actual.estudiante_id;
+            document.getElementById('edit-nombre').value = actual.nombre_completo || '';
+            document.getElementById('edit-usuario').value = actual.usuario || '';
+            document.getElementById('edit-email').value = actual.email || '';
+            document.getElementById('edit-telefono').value = actual.telefono || '';
+            document.getElementById('edit-direccion').value = actual.direccion || '';
+            document.getElementById('edit-tipo-doc').value = (actual.tipo_documento || 'CC').toUpperCase();
+            document.getElementById('edit-numero-doc').value = actual.numero_documento || '';
+            document.getElementById('edit-contrasena').value = '';
+
+            document.getElementById('edit-estudiante-modal').style.display = 'block';
+        }
+
+        function cerrarEditarEstudianteModal() {
+            document.getElementById('edit-estudiante-modal').style.display = 'none';
+        }
+
+        async function guardarEdicionEstudiante() {
+            const estudianteId = Number(document.getElementById('edit-estudiante-id').value);
+            const nombre = document.getElementById('edit-nombre').value.trim();
+            const usuario = document.getElementById('edit-usuario').value.trim();
+            const email = document.getElementById('edit-email').value.trim();
+            const telefono = document.getElementById('edit-telefono').value.trim();
+            const direccion = document.getElementById('edit-direccion').value.trim();
+            const tipoDoc = document.getElementById('edit-tipo-doc').value.trim().toUpperCase();
+            const numeroDoc = document.getElementById('edit-numero-doc').value.trim();
+            const contrasena = document.getElementById('edit-contrasena').value;
+
+            if (!nombre || !usuario || !email || !tipoDoc || !numeroDoc) {
+                alert('Completa los campos obligatorios para actualizar');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/estudiantes/update/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        estudiante_id: estudianteId,
+                        nombre_completo: nombre,
+                        email: email,
+                        telefono: telefono,
+                        direccion: direccion,
+                        tipo_documento: tipoDoc,
+                        numero_documento: numeroDoc,
+                        usuario: usuario,
+                        contrasena: contrasena
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No se pudo actualizar'));
+                    return;
+                }
+
+                alert('Estudiante actualizado correctamente');
+                cerrarEditarEstudianteModal();
+                await cargarEstudiantes();
+            } catch (error) {
+                alert('Error de conexión al actualizar estudiante');
+            }
+        }
+
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('edit-estudiante-modal');
+            if (event.target === modal) {
+                cerrarEditarEstudianteModal();
+            }
+        });
+
+        async function eliminarEstudiante(estudianteId) {
+            const confirmar = confirm('¿Seguro que deseas eliminar este estudiante?');
+            if (!confirmar) return;
+
+            try {
+                const response = await fetch('/api/estudiantes/delete/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ estudiante_id: estudianteId })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No se pudo eliminar'));
+                    return;
+                }
+
+                alert('Estudiante eliminado correctamente');
+                await cargarEstudiantes();
+            } catch (error) {
+                alert('Error de conexión al eliminar estudiante');
+            }
+        }
+
+        async function createEstudiante() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const telefono = document.getElementById('telefono').value.trim();
+            const direccion = document.getElementById('direccion').value.trim();
+            const usuario = document.getElementById('usuario').value.trim();
+            const contrasena = document.getElementById('contrasena').value;
+            const tipo_doc = document.getElementById('tipo_doc').value;
+            const numero_doc = document.getElementById('numero_doc').value.trim();
+
+            if (!nombre || !email || !usuario || !contrasena || !tipo_doc || !numero_doc) {
+                alert('Por favor completa los campos requeridos');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/estudiantes/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre_completo: nombre,
+                        email: email,
+                        telefono: telefono,
+                        direccion: direccion,
+                        usuario: usuario,
+                        contrasena: contrasena,
+                        tipo_documento: tipo_doc,
+                        numero_documento: numero_doc
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Estudiante registrado exitosamente');
+                    document.getElementById('nombre').value = '';
+                    document.getElementById('email').value = '';
+                    document.getElementById('telefono').value = '';
+                    document.getElementById('direccion').value = '';
+                    document.getElementById('usuario').value = '';
+                    document.getElementById('contrasena').value = '';
+                    document.getElementById('tipo_doc').value = '';
+                    document.getElementById('numero_doc').value = '';
+                    toggleForm();
+                    cargarEstudiantes();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error registrando estudiante');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+
+

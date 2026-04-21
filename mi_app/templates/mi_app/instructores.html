@@ -1,0 +1,314 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Instructores</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="/admin-dashboard/">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/" class="active">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Gestión de Instructores</h2>
+
+        <div class="form-container" style="display:block;">
+            <h3 style="margin-bottom: 18px;">Crear Nuevo Instructor</h3>
+            <div class="form-grid">
+                <input id="nombre" placeholder="Nombre Completo" type="text">
+                <input id="especialidad" placeholder="Especialidad" type="text">
+                <input id="cedula" placeholder="Cédula Profesional" type="text">
+                <input id="usuario" placeholder="Usuario" type="text" autocomplete="off">
+                <input id="contrasena" placeholder="Contraseña" type="password" autocomplete="new-password">
+                <select id="estado">
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                </select>
+            </div>
+            <div style="display:flex; gap:10px; margin-top: 14px;">
+                <button class="btn btn-primary" onclick="crearInstructor()">Crear Instructor</button>
+                <button class="btn btn-secondary" onclick="limpiarFormulario()">Limpiar</button>
+            </div>
+        </div>
+
+        <div class="table-container" style="margin-top:20px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Especialidad</th>
+                        <th>Cédula</th>
+                        <th>Usuario</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-instructores">
+                    <tr><td colspan="7" style="text-align:center;">Cargando instructores...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal" id="edit-instructor-modal">
+        <div class="modal-content">
+            <div class="modal-header">Editar Instructor</div>
+            <input type="hidden" id="edit-instructor-id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="edit-instructor-nombre">Nombre Completo</label>
+                    <input id="edit-instructor-nombre" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-instructor-usuario">Usuario</label>
+                    <input id="edit-instructor-usuario" type="text" autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="edit-instructor-especialidad">Especialidad</label>
+                    <input id="edit-instructor-especialidad" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-instructor-cedula">Cédula Profesional</label>
+                    <input id="edit-instructor-cedula" type="text">
+                </div>
+                <div class="form-group">
+                    <label for="edit-instructor-estado">Estado</label>
+                    <select id="edit-instructor-estado">
+                        <option value="activo">Activo</option>
+                        <option value="inactivo">Inactivo</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit-instructor-contrasena">Nueva Contraseña (Opcional)</label>
+                    <input id="edit-instructor-contrasena" type="password" autocomplete="new-password" placeholder="Dejar vacío para no cambiar">
+                </div>
+            </div>
+            <div class="button-group" style="margin-top: 20px;">
+                <button class="btn btn-secondary" onclick="cerrarEditarInstructorModal()">Cancelar</button>
+                <button class="btn btn-primary" onclick="guardarEdicionInstructor()">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let instructoresActuales = [];
+
+        function verificarAdmin() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'admin') {
+                window.location.href = '/';
+                return false;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function limpiarFormulario() {
+            document.getElementById('nombre').value = '';
+            document.getElementById('especialidad').value = '';
+            document.getElementById('cedula').value = '';
+            document.getElementById('usuario').value = '';
+            document.getElementById('contrasena').value = '';
+            document.getElementById('estado').value = 'activo';
+        }
+
+        async function cargarInstructores() {
+            try {
+                const instructores = await fetch('/api/instructores-admin/').then(r => r.json());
+                const tbody = document.getElementById('tbody-instructores');
+                instructoresActuales = Array.isArray(instructores) ? instructores : [];
+
+                if (instructoresActuales.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No hay instructores registrados</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = instructoresActuales.map(i => `
+                    <tr>
+                        <td>#${i.instructor_id}</td>
+                        <td>${i.nombre_completo}</td>
+                        <td>${i.especialidad || 'N/A'}</td>
+                        <td>${i.cedula_profesional || 'N/A'}</td>
+                        <td>${i.usuario}</td>
+                        <td>${i.estado}</td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn btn-primary" style="padding:6px 10px;" onclick="editarInstructor(${i.instructor_id})">Editar</button>
+                                <button class="btn btn-secondary" style="padding:6px 10px;" onclick="eliminarInstructor(${i.instructor_id})">Eliminar</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('tbody-instructores').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#e74c3c;">Error cargando instructores</td></tr>';
+            }
+        }
+
+        async function editarInstructor(instructorId) {
+            const actual = instructoresActuales.find(i => i.instructor_id === instructorId);
+            if (!actual) return;
+
+            document.getElementById('edit-instructor-id').value = actual.instructor_id;
+            document.getElementById('edit-instructor-nombre').value = actual.nombre_completo || '';
+            document.getElementById('edit-instructor-usuario').value = actual.usuario || '';
+            document.getElementById('edit-instructor-especialidad').value = actual.especialidad || '';
+            document.getElementById('edit-instructor-cedula').value = actual.cedula_profesional || '';
+            document.getElementById('edit-instructor-estado').value = (actual.estado || 'activo').toLowerCase();
+            document.getElementById('edit-instructor-contrasena').value = '';
+
+            document.getElementById('edit-instructor-modal').style.display = 'block';
+        }
+
+        function cerrarEditarInstructorModal() {
+            document.getElementById('edit-instructor-modal').style.display = 'none';
+        }
+
+        async function guardarEdicionInstructor() {
+            const instructorId = Number(document.getElementById('edit-instructor-id').value);
+            const nombre = document.getElementById('edit-instructor-nombre').value.trim();
+            const usuario = document.getElementById('edit-instructor-usuario').value.trim();
+            const especialidad = document.getElementById('edit-instructor-especialidad').value.trim();
+            const cedula = document.getElementById('edit-instructor-cedula').value.trim();
+            const estado = document.getElementById('edit-instructor-estado').value.trim().toLowerCase();
+            const contrasena = document.getElementById('edit-instructor-contrasena').value;
+
+            if (!nombre || !cedula || !usuario || !estado) {
+                alert('Completa los campos obligatorios para actualizar');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/instructores/update/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        nombre_completo: nombre,
+                        especialidad: especialidad,
+                        cedula_profesional: cedula,
+                        usuario: usuario,
+                        estado: estado,
+                        contrasena: contrasena
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No se pudo actualizar'));
+                    return;
+                }
+
+                alert('Instructor actualizado correctamente');
+                cerrarEditarInstructorModal();
+                await cargarInstructores();
+            } catch (error) {
+                alert('Error de conexión al actualizar instructor');
+            }
+        }
+
+        window.addEventListener('click', function(event) {
+            const modal = document.getElementById('edit-instructor-modal');
+            if (event.target === modal) {
+                cerrarEditarInstructorModal();
+            }
+        });
+
+        async function eliminarInstructor(instructorId) {
+            const confirmar = confirm('¿Seguro que deseas eliminar este instructor?');
+            if (!confirmar) return;
+
+            try {
+                const response = await fetch('/api/instructores/delete/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ instructor_id: instructorId })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No se pudo eliminar'));
+                    return;
+                }
+
+                alert('Instructor eliminado correctamente');
+                await cargarInstructores();
+            } catch (error) {
+                alert('Error de conexión al eliminar instructor');
+            }
+        }
+
+        async function crearInstructor() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const especialidad = document.getElementById('especialidad').value.trim();
+            const cedula = document.getElementById('cedula').value.trim();
+            const usuario = document.getElementById('usuario').value.trim();
+            const contrasena = document.getElementById('contrasena').value;
+            const estado = document.getElementById('estado').value;
+
+            if (!nombre || !cedula || !usuario || !contrasena) {
+                alert('Nombre, cédula, usuario y contraseña son obligatorios');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/instructores/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre_completo: nombre,
+                        especialidad,
+                        cedula_profesional: cedula,
+                        usuario,
+                        contrasena,
+                        estado
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No se pudo crear el instructor'));
+                    return;
+                }
+
+                alert('Instructor creado correctamente');
+                limpiarFormulario();
+                await cargarInstructores();
+            } catch (error) {
+                alert('Error de conexión al crear instructor');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarAdmin()) {
+                cargarInstructores();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,79 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel Instructor</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Instructor</h1>
+        <div class="nav-links">
+            <a href="/instructor-dashboard/" class="active">Menú</a>
+            <a href="/instructor-cursos/">Cursos</a>
+            <a href="/instructor-alumnos/">Alumnos</a>
+            <a href="/instructor-calificaciones/">Calificaciones</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Menú Principal del Instructor</h2>
+
+        <div class="dashboard-grid">
+            <div class="card card-courses">
+                <h3>Mis Cursos</h3>
+                <p>Visualiza los cursos asignados y su avance general</p>
+                <a href="/instructor-cursos/">Ir a Cursos</a>
+            </div>
+            <div class="card card-students">
+                <h3>Mis Alumnos</h3>
+                <p>Consulta los alumnos inscritos en tus cursos</p>
+                <a href="/instructor-alumnos/">Ir a Alumnos</a>
+            </div>
+            <div class="card card-grades">
+                <h3>Calificaciones</h3>
+                <p>Registrar y gestionar calificaciones de estudiantes</p>
+                <a href="/instructor-calificaciones/">Ir a Calificaciones</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cargar información del usuario
+        function cargarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role !== 'instructor') {
+                alert('Acceso denegado. Solo instructores pueden acceder aquí.');
+                window.location.href = '/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = `Bienvenido, ${user.nombre}`;
+        }
+
+        // Logout
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarUsuario();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
+

@@ -1,0 +1,125 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mi Panel - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/" class="active">Menú</a>
+            <a href="/estudiante-mis-cursos/">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/">Calificaciones</a>
+            <a href="/estudiante-inscripcion/">Inscripción</a>
+            <a href="/estudiante-perfil/">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2 id="bienvenida"></h2>
+        
+        <div class="stats" id="stats-container">
+            <!-- Las estadísticas se cargarán con JavaScript -->
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card card-courses">
+                <h3>Mis Cursos</h3>
+                <p>Consulta los cursos en los que ya estás inscrito</p>
+                <a href="/estudiante-mis-cursos/">Ver Mis Cursos</a>
+            </div>
+
+            <div class="card card-grades">
+                <h3>Mis Calificaciones</h3>
+                <p>Consulta tus calificaciones y evaluaciones</p>
+                <a href="/estudiante-calificaciones/">Ver Calificaciones</a>
+            </div>
+
+            <div class="card card-enrollments">
+                <h3>Inscripción</h3>
+                <p>Agrega cursos al carrito y paga el total final</p>
+                <a href="/estudiante-inscripcion/">Inscribirme</a>
+            </div>
+
+            <div class="card card-profile">
+                <h3>Mi Perfil</h3>
+                <p>Consulta y actualiza tu información básica</p>
+                <a href="/estudiante-perfil/">Editar Perfil</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let usuarioData = {};
+
+        // Cargar información del usuario
+        function cargarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role !== 'estudiante') {
+                alert('Acceso denegado. Solo estudiantes pueden acceder aquí.');
+                window.location.href = '/';
+                return;
+            }
+            usuarioData = user;
+            document.getElementById('usuario-nombre').textContent = `${user.nombre}`;
+            document.getElementById('bienvenida').textContent = `¡Bienvenido, ${user.nombre}!`;
+            cargarEstadisticas();
+        }
+
+        // Logout
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        // Cargar estadísticas
+        async function cargarEstadisticas() {
+            try {
+                const [evaluaciones, inscripciones] = await Promise.all([
+                    fetch(`/api/evaluaciones-estudiante/?estudiante_id=${usuarioData.id}`).then(r => r.json()),
+                    fetch(`/api/estudiante-inscripciones/?estudiante_id=${usuarioData.id}`).then(r => r.json())
+                ]);
+
+                const inscripcionesArray = Array.isArray(inscripciones) ? inscripciones : [];
+                const evaluacionesArray = Array.isArray(evaluaciones) ? evaluaciones : [];
+
+                const statsHtml = `
+                    <div class="stat-box">
+                        <div class="stat-number">${inscripcionesArray.length}</div>
+                        <div class="stat-label">Mis Cursos</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${evaluacionesArray.length}</div>
+                        <div class="stat-label">Mis Evaluaciones</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${evaluacionesArray.length > 0 ? (evaluacionesArray.reduce((sum, e) => sum + (parseFloat(e.calificacion) || 0), 0) / evaluacionesArray.length).toFixed(1) : '0'}</div>
+                        <div class="stat-label">Promedio de Calificación</div>
+                    </div>
+                `;
+                
+                document.getElementById('stats-container').innerHTML = statsHtml;
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+            }
+        }
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', cargarUsuario);
+    </script>
+</body>
+</html>
+
+
+

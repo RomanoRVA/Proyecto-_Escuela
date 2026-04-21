@@ -1,0 +1,200 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="javascript:void(0)" onclick="irAlDashboard()">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/" class="active">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Reportes del Sistema</h2>
+        
+        <div class="stat-grid" id="stats-container">
+            <!-- Las estadísticas se cargarán aquí -->
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="2" style="font-size: 16px; padding: 20px;">Cursos Más Demandados</th>
+                    </tr>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Total de Inscripciones</th>
+                    </tr>
+                </thead>
+                <tbody id="demanda-tbody">
+                    <tr><td colspan="2" style="text-align: center; padding: 30px;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="table-container" style="margin-top: 30px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th colspan="13" style="font-size: 16px; padding: 20px;">Inscripciones por Mes</th>
+                    </tr>
+                    <tr>
+                        <th>Año</th>
+                        <th>Enero</th>
+                        <th>Febrero</th>
+                        <th>Marzo</th>
+                        <th>Abril</th>
+                        <th>Mayo</th>
+                        <th>Junio</th>
+                        <th>Julio</th>
+                        <th>Agosto</th>
+                        <th>Septiembre</th>
+                        <th>Octubre</th>
+                        <th>Noviembre</th>
+                        <th>Diciembre</th>
+                    </tr>
+                </thead>
+                <tbody id="mes-tbody">
+                    <tr><td colspan="13" style="text-align: center; padding: 30px;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarUsuario();
+            cargarReportes();
+        });
+
+        function verificarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function irAlDashboard() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'admin') {
+                window.location.href = '/admin-dashboard/';
+            } else if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+            } else if (user.role === 'estudiante') {
+                window.location.href = '/estudiante-dashboard/';
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        async function cargarReportes() {
+            try {
+                const [demanda, mes, estudiantes, cursos] = await Promise.all([
+                    fetch('/api/curso-demanda/').then(r => r.json()),
+                    fetch('/api/inscripciones-por-mes/').then(r => r.json()),
+                    fetch('/api/estudiantes/').then(r => r.json()),
+                    fetch('/api/cursos/').then(r => r.json())
+                ]);
+
+                // Cargar estadísticas
+                const statsHtml = `
+                    <div class="stat-card">
+                        <div class="stat-number">${estudiantes.length}</div>
+                        <div class="stat-label">Estudiantes Registrados</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${cursos.length}</div>
+                        <div class="stat-label">Cursos Disponibles</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${demanda.reduce((sum, d) => sum + d.total_inscripciones, 0)}</div>
+                        <div class="stat-label">Total de Inscripciones</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">${(demanda.reduce((sum, d) => sum + d.total_inscripciones, 0) / (demanda.length || 1)).toFixed(1)}</div>
+                        <div class="stat-label">Promedio por Curso</div>
+                    </div>
+                `;
+                document.getElementById('stats-container').innerHTML = statsHtml;
+
+                // Cargar cursos demandados
+                const demandaTbody = document.getElementById('demanda-tbody');
+                if (demanda.length === 0) {
+                    demandaTbody.innerHTML = '<tr><td colspan="2" style="text-align: center; padding: 30px;">No hay datos</td></tr>';
+                } else {
+                    const demandaOrdenada = demanda.sort((a, b) => b.total_inscripciones - a.total_inscripciones);
+                    demandaTbody.innerHTML = demandaOrdenada.map((d, index) => {
+                        let badge = 'low';
+                        if (d.total_inscripciones > 5) badge = 'high';
+                        else if (d.total_inscripciones > 2) badge = 'medium';
+                        return `
+                            <tr>
+                                <td><strong>${index + 1}. ${d.nombre_curso}</strong></td>
+                                <td><span class="badge badge-${badge}">${d.total_inscripciones} inscripciones</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                }
+
+                // Cargar inscripciones por mes
+                const mesTbody = document.getElementById('mes-tbody');
+                if (mes.length === 0) {
+                    mesTbody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 30px;">No hay datos</td></tr>';
+                } else {
+                    mesTbody.innerHTML = mes.map(m => `
+                        <tr>
+                            <td><strong>${m.anio}</strong></td>
+                            <td>${m.enero}</td>
+                            <td>${m.febrero}</td>
+                            <td>${m.marzo}</td>
+                            <td>${m.abril}</td>
+                            <td>${m.mayo}</td>
+                            <td>${m.junio}</td>
+                            <td>${m.julio}</td>
+                            <td>${m.agosto}</td>
+                            <td>${m.septiembre}</td>
+                            <td>${m.octubre}</td>
+                            <td>${m.noviembre}</td>
+                            <td>${m.diciembre}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error cargando reportes');
+            }
+        }
+    </script>
+</body>
+</html>
+
+

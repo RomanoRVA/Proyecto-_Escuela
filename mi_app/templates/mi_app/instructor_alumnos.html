@@ -1,0 +1,128 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Alumnos - Instructor</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Mis Alumnos</h1>
+        <div class="nav-links">
+            <a href="/instructor-dashboard/">Menú</a>
+            <a href="/instructor-cursos/">Cursos</a>
+            <a href="/instructor-alumnos/" class="active">Alumnos</a>
+            <a href="/instructor-calificaciones/">Calificaciones</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Alumnos de Mis Cursos</h2>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Alumno</th>
+                        <th>Cursos Inscritos</th>
+                        <th>Calificaciones Registradas</th>
+                        <th>Promedio</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-alumnos">
+                    <tr><td colspan="4" style="text-align:center; padding:24px;">Cargando alumnos...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let instructorId = null;
+
+        function verificarInstructor() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'instructor') {
+                window.location.href = '/';
+                return false;
+            }
+            instructorId = user.id;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        async function cargarAlumnosInstructor() {
+            try {
+                const response = await fetch(`/calificaciones-instructor/?instructor_id=${instructorId}`);
+                const data = await response.json();
+                const tbody = document.getElementById('tbody-alumnos');
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:24px;">No hay alumnos en tus cursos</td></tr>';
+                    return;
+                }
+
+                const statsPorAlumno = new Map();
+
+                data.forEach(item => {
+                    const key = item.estudiante_id;
+                    if (!statsPorAlumno.has(key)) {
+                        statsPorAlumno.set(key, {
+                            nombre: item.nombre_estudiante,
+                            cursos: new Set(),
+                            calificaciones: []
+                        });
+                    }
+
+                    const alumno = statsPorAlumno.get(key);
+                    alumno.cursos.add(item.curso_id);
+
+                    if (item.calificacion !== null && item.calificacion !== undefined && item.calificacion !== '') {
+                        const valor = parseFloat(item.calificacion);
+                        if (!Number.isNaN(valor)) {
+                            alumno.calificaciones.push(valor);
+                        }
+                    }
+                });
+
+                tbody.innerHTML = Array.from(statsPorAlumno.values()).map(alumno => {
+                    const totalCalifs = alumno.calificaciones.length;
+                    const promedio = totalCalifs
+                        ? (alumno.calificaciones.reduce((a, b) => a + b, 0) / totalCalifs).toFixed(2)
+                        : 'N/A';
+
+                    return `
+                        <tr>
+                            <td><strong>${alumno.nombre}</strong></td>
+                            <td>${alumno.cursos.size}</td>
+                            <td>${totalCalifs}</td>
+                            <td>${promedio}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                document.getElementById('tbody-alumnos').innerHTML = '<tr><td colspan="4" style="text-align:center; color:#dc2626;">Error cargando alumnos</td></tr>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            if (verificarInstructor()) {
+                cargarAlumnosInstructor();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

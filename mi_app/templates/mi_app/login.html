@@ -1,0 +1,107 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Plataforma Educativa</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+    <style>
+        .login-top-logo {
+            position: fixed;
+            top: 16px;
+            right: 20px;
+            width: 280px;
+            height: auto;
+            z-index: 20;
+            filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.2));
+        }
+
+        @media (max-width: 768px) {
+            .login-top-logo {
+                width: 190px;
+                top: 10px;
+                right: 12px;
+            }
+        }
+    </style>
+</head>
+<body class="login-page">
+    <img src="{% static 'img/LOGO2.png' %}" alt="Logo" class="login-top-logo">
+    <div class="login-container">
+        <h1>Nexa Learning</h1>
+        <p class="subtitle">Ingresa a tu cuenta</p>
+        <div class="form-group">
+            <input type="text" id="usuario" placeholder="Usuario" autocomplete="username">
+        </div>
+        
+        <div class="form-group" style="position:relative;">
+            <input type="password" id="contrasena" placeholder="Contraseña" autocomplete="current-password" style="padding-right:38px;">
+            <span id="togglePassword" style="position:absolute;top:50%;right:12px;transform:translateY(-50%);cursor:pointer;font-size:12px;color:#27ae60;user-select:none;" title="Mostrar/Ocultar">Ver</span>
+        </div>
+        
+        <button onclick="login()">Iniciar Sesión</button>
+        <p id="message"></p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('contrasena').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    login();
+                }
+            });
+            // Función de mostrar/ocultar contraseña
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('contrasena');
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.type === 'password' ? 'text' : 'password';
+                passwordInput.type = type;
+                togglePassword.textContent = type === 'password' ? 'Ver' : 'Ocultar';
+            });
+        });
+
+        async function login() {
+            const usuario = document.getElementById('usuario').value.trim();
+            const contrasena = document.getElementById('contrasena').value;
+            const messageEl = document.getElementById('message');
+            
+            if (!usuario || !contrasena) {
+                messageEl.textContent = 'Por favor completa todos los campos';
+                messageEl.className = 'error';
+                return;
+            }
+            
+            messageEl.textContent = 'Verificando...';
+            messageEl.className = '';
+            
+            try {
+                const response = await fetch('/api/login/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario, contrasena })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    localStorage.setItem('user', JSON.stringify({
+                        nombre: data.nombre,
+                        role: data.role,
+                        id: data.instructor_id || data.admin_id || data.estudiante_id || null
+                    }));
+                    messageEl.textContent = '';
+                    window.location.href = data.redirect;
+                } else {
+                    messageEl.textContent = data.message || 'Credenciales inválidas';
+                    messageEl.className = 'error';
+                }
+            } catch (error) {
+                messageEl.textContent = 'Error de conexión. Intenta nuevamente.';
+                messageEl.className = 'error';
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
+

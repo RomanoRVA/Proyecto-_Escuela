@@ -1,0 +1,605 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Cursos - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+    <style>
+        .cursos-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .curso-card {
+            display: grid;
+            grid-template-columns: 12px 1fr;
+            background: rgba(255, 255, 255, 0.94);
+            border-radius: 10px;
+            border: 1px solid rgba(15, 42, 61, 0.14);
+            box-shadow: 0 10px 26px rgba(12, 42, 58, 0.12);
+            overflow: hidden;
+        }
+
+        .curso-accent {
+            background: var(--accent-color, #5bc0de);
+        }
+
+        .curso-content {
+            padding: 18px 20px;
+        }
+
+        .curso-codigo {
+            color: #637685;
+            font-weight: 700;
+            font-size: 28px;
+            letter-spacing: 0.2px;
+        }
+
+        .curso-titulo {
+            margin-top: 6px;
+            font-size: 32px;
+            color: #243443;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .curso-meta {
+            margin-top: 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            color: #4a5f70;
+            font-size: 20px;
+        }
+
+        .curso-meta .separador {
+            opacity: 0.5;
+        }
+
+        .entregables-box {
+            margin-top: 16px;
+            border: 1px solid rgba(15, 42, 61, 0.14);
+            border-radius: 8px;
+            background: #f7fafc;
+            overflow: hidden;
+        }
+
+        .entregables-toggle {
+            width: 100%;
+            border: none;
+            padding: 14px 16px;
+            background: #f1f5f9;
+            color: #12263a;
+            font-weight: 700;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .entregables-toggle:hover {
+            background: #e8eef5;
+        }
+
+        .chevron {
+            transition: transform 0.2s ease;
+            font-size: 15px;
+        }
+
+        .entregables-toggle.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        .entregables-content {
+            display: none;
+            padding: 12px 14px 14px;
+            border-top: 1px solid rgba(15, 42, 61, 0.12);
+        }
+
+        .entregables-content.open {
+            display: block;
+        }
+
+        .tarea-item {
+            background: #ffffff;
+            border: 1px solid rgba(15, 42, 61, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .tarea-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .tarea-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .tarea-titulo {
+            font-weight: 700;
+            color: #11263a;
+        }
+
+        .tarea-info {
+            color: #4d6273;
+            font-size: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tarea-descripcion {
+            margin-top: 6px;
+            color: #334a5c;
+            font-size: 14px;
+        }
+
+        .tarea-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .entrega-panel {
+            margin-top: 12px;
+            border: 1px solid rgba(15, 42, 61, 0.14);
+            border-radius: 8px;
+            background: #f4f6f8;
+            display: none;
+        }
+
+        .entrega-panel.open {
+            display: block;
+        }
+
+        .entrega-grid {
+            display: grid;
+            grid-template-columns: 1.35fr 0.9fr;
+            min-height: 260px;
+        }
+
+        .entrega-main {
+            padding: 16px;
+            border-right: 1px solid rgba(15, 42, 61, 0.12);
+        }
+
+        .entrega-side {
+            padding: 16px;
+            background: #eef2f5;
+        }
+
+        .entrega-title {
+            margin: 0;
+            font-size: 28px;
+            color: #1c2b39;
+            font-weight: 700;
+        }
+
+        .entrega-subtitle {
+            margin-top: 8px;
+            margin-bottom: 14px;
+            color: #607283;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .entrega-instrucciones {
+            color: #2f4355;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            background: #fff;
+            border: 1px solid rgba(15, 42, 61, 0.1);
+            border-radius: 8px;
+            padding: 12px;
+            min-height: 90px;
+        }
+
+        .detalle-title {
+            margin: 0 0 12px;
+            color: #2c3c4a;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        .detalle-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(15, 42, 61, 0.12);
+            font-size: 14px;
+            color: #314657;
+        }
+
+        .detalle-item:last-child {
+            margin-bottom: 0;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .detalle-label {
+            display: block;
+            color: #5e7485;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin-bottom: 3px;
+            font-weight: 700;
+        }
+
+        .entrega-form {
+            margin-top: 14px;
+            background: #fff;
+            border: 1px solid rgba(15, 42, 61, 0.12);
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .entrega-form h5 {
+            margin: 0 0 10px;
+            color: #223545;
+            font-size: 16px;
+        }
+
+        .entrega-form .form-group-local {
+            margin-bottom: 10px;
+        }
+
+        .entrega-form textarea {
+            min-height: 76px;
+        }
+
+        .entrega-form-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .texto-vacio {
+            text-align: center;
+            color: #5a7183;
+            padding: 12px;
+        }
+
+        @media (max-width: 1100px) {
+            .entrega-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .entrega-main {
+                border-right: none;
+                border-bottom: 1px solid rgba(15, 42, 61, 0.12);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .curso-codigo {
+                font-size: 18px;
+            }
+
+            .curso-titulo {
+                font-size: 23px;
+            }
+
+            .curso-meta {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/">Menú</a>
+            <a href="/estudiante-mis-cursos/" class="active">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/">Calificaciones</a>
+            <a href="/estudiante-inscripcion/">Inscripción</a>
+            <a href="/estudiante-perfil/">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Mis Cursos Inscritos</h2>
+        <div id="message" class="message"></div>
+        <div id="contenedor-cursos" class="cursos-stack">
+            <div class="table-container" style="padding: 20px; text-align:center;">Cargando cursos...</div>
+        </div>
+    </div>
+
+    <script>
+        let usuarioData = {};
+        const ACCENT_COLORS = ['#69d2c1', '#74d76f', '#3ac4de', '#f35a95', '#7cdaea', '#f5b544'];
+        const entregablesById = {};
+
+        function verificarEstudiante() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'estudiante') {
+                window.location.href = '/';
+                return false;
+            }
+            usuarioData = user;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const msg = document.getElementById('message');
+            msg.textContent = texto;
+            msg.className = `message ${tipo}`;
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 4500);
+        }
+
+        function formatFecha(valor) {
+            if (!valor) return '-';
+            const fecha = new Date(valor);
+            if (Number.isNaN(fecha.getTime())) return valor;
+            return fecha.toLocaleString();
+        }
+
+        function escapeHtml(texto) {
+            return String(texto || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function badgeEstado(valor) {
+            const estado = (valor || '').toLowerCase();
+            return `<span class="badge badge-${escapeHtml(estado)}">${escapeHtml(valor || '-')}</span>`;
+        }
+
+        function toggleEntregables(cursoId) {
+            const content = document.getElementById(`entregables-content-${cursoId}`);
+            const btn = document.getElementById(`entregables-toggle-${cursoId}`);
+            if (!content || !btn) return;
+
+            content.classList.toggle('open');
+            btn.classList.toggle('open');
+        }
+
+        function limpiarFormularioEntrega(entregableId) {
+            const fileInput = document.getElementById(`archivo-${entregableId}`);
+            const obsInput = document.getElementById(`observaciones-${entregableId}`);
+            if (fileInput) fileInput.value = '';
+            if (obsInput) obsInput.value = '';
+        }
+
+        function toggleEntregaPanel(entregableId) {
+            const panel = document.getElementById(`entrega-panel-${entregableId}`);
+            if (!panel) return;
+            panel.classList.toggle('open');
+        }
+
+        function renderTareasCurso(cursoId, tareas) {
+            if (!Array.isArray(tareas) || tareas.length === 0) {
+                return '<div class="texto-vacio">Este curso aún no tiene entregables publicados.</div>';
+            }
+
+            return tareas.map(tarea => {
+                const calificacion = (tarea.calificacion !== null && tarea.calificacion !== undefined)
+                    ? Number(tarea.calificacion).toFixed(2)
+                    : '-';
+                const estadoEntrega = tarea.estado_entrega || 'pendiente';
+                const puntaje = (tarea.puntaje_maximo !== null && tarea.puntaje_maximo !== undefined)
+                    ? Number(tarea.puntaje_maximo).toFixed(2)
+                    : '-';
+                const archivoActual = tarea.archivo_ruta
+                    ? `<a href="/media/${tarea.archivo_ruta}" target="_blank" rel="noopener">${escapeHtml(tarea.archivo_nombre_original || 'Ver archivo subido')}</a>`
+                    : 'Sin archivo enviado';
+
+                const descripcion = tarea.descripcion
+                    ? `<div class="tarea-descripcion">${escapeHtml(tarea.descripcion)}</div>`
+                    : '';
+
+                return `
+                    <div class="tarea-item">
+                        <div class="tarea-header">
+                            <div class="tarea-titulo">${escapeHtml(tarea.titulo)}</div>
+                            ${badgeEstado(estadoEntrega)}
+                        </div>
+                        <div class="tarea-info">
+                            <span>Fecha límite: ${escapeHtml(formatFecha(tarea.fecha_limite))}</span>
+                            <span>Calificación: ${escapeHtml(calificacion)}</span>
+                        </div>
+                        ${descripcion}
+                        <div class="tarea-actions">
+                            <button class="btn btn-primary" onclick="toggleEntregaPanel(${tarea.entregable_id})">Abrir Entrega</button>
+                        </div>
+
+                        <div id="entrega-panel-${tarea.entregable_id}" class="entrega-panel">
+                            <div class="entrega-grid">
+                                <div class="entrega-main">
+                                    <h4 class="entrega-title">${escapeHtml(tarea.titulo)}</h4>
+                                    <div class="entrega-subtitle">Instrucciones de la actividad</div>
+                                    <div class="entrega-instrucciones">${escapeHtml(tarea.descripcion || 'No hay instrucciones adicionales para esta actividad.')}</div>
+
+                                    <div class="entrega-form">
+                                        <h5>Entrega</h5>
+                                        <div class="form-group-local">
+                                            <input id="archivo-${tarea.entregable_id}" type="file">
+                                        </div>
+                                        <div class="form-group-local">
+                                            <textarea id="observaciones-${tarea.entregable_id}" placeholder="Comentario para tu entrega (opcional)"></textarea>
+                                        </div>
+                                        <div class="entrega-form-actions">
+                                            <button class="btn btn-secondary" onclick="limpiarFormularioEntrega(${tarea.entregable_id})">Limpiar</button>
+                                            <button class="btn btn-primary" onclick="subirEntrega(${tarea.entregable_id})">Enviar</button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="entrega-side">
+                                    <h4 class="detalle-title">Detalles e información</h4>
+                                    <div class="detalle-item">
+                                        <span class="detalle-label">Fecha límite</span>
+                                        ${escapeHtml(formatFecha(tarea.fecha_limite))}
+                                    </div>
+                                    <div class="detalle-item">
+                                        <span class="detalle-label">Estado de la entrega</span>
+                                        ${badgeEstado(estadoEntrega)}
+                                    </div>
+                                    <div class="detalle-item">
+                                        <span class="detalle-label">Calificación</span>
+                                        ${escapeHtml(calificacion)} / 100
+                                    </div>
+                                    <div class="detalle-item">
+                                        <span class="detalle-label">Puntuación máxima</span>
+                                        ${escapeHtml(puntaje)} puntos
+                                    </div>
+                                    <div class="detalle-item">
+                                        <span class="detalle-label">Archivo actual</span>
+                                        ${archivoActual}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function subirEntrega(entregableId) {
+            const entregable_id = entregableId;
+            const archivoInput = document.getElementById(`archivo-${entregableId}`);
+            const obsInput = document.getElementById(`observaciones-${entregableId}`);
+            const archivo = archivoInput ? archivoInput.files[0] : null;
+            const observaciones_estudiante = obsInput ? obsInput.value.trim() : '';
+
+            if (!entregable_id) {
+                mostrarMensaje('Selecciona una tarea desde tu curso', 'error');
+                return;
+            }
+
+            if (!archivo) {
+                mostrarMensaje('Selecciona un archivo para enviar', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('entregable_id', entregable_id);
+            formData.append('estudiante_id', usuarioData.id);
+            formData.append('archivo', archivo);
+            formData.append('observaciones_estudiante', observaciones_estudiante);
+
+            try {
+                const response = await fetch('/api/entregas/upload/', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    mostrarMensaje('Entrega subida correctamente', 'success');
+                    limpiarFormularioEntrega(entregableId);
+                    await cargarMisCursos();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo subir el archivo', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al subir la entrega', 'error');
+            }
+        }
+
+        async function cargarMisCursos() {
+            try {
+                const [inscripciones, entregables] = await Promise.all([
+                    fetch(`/api/estudiante-inscripciones/?estudiante_id=${usuarioData.id}`).then(r => r.json()),
+                    fetch(`/api/entregables/estudiante/?estudiante_id=${usuarioData.id}`).then(r => r.json())
+                ]);
+
+                const contenedor = document.getElementById('contenedor-cursos');
+                if (!Array.isArray(inscripciones) || inscripciones.length === 0) {
+                    contenedor.innerHTML = '<div class="table-container" style="padding: 20px; text-align:center;">No tienes cursos inscritos.</div>';
+                    return;
+                }
+
+                const tareasPorCurso = {};
+                if (Array.isArray(entregables)) {
+                    Object.keys(entregablesById).forEach(key => delete entregablesById[key]);
+                    entregables.forEach(tarea => {
+                        const key = String(tarea.curso_id);
+                        if (!tareasPorCurso[key]) {
+                            tareasPorCurso[key] = [];
+                        }
+                        tareasPorCurso[key].push(tarea);
+                        entregablesById[String(tarea.entregable_id)] = tarea;
+                    });
+                }
+
+                contenedor.innerHTML = inscripciones.map((curso, index) => {
+                    const cursoId = curso.curso_id;
+                    const key = String(cursoId);
+                    const tareas = tareasPorCurso[key] || [];
+                    const color = ACCENT_COLORS[index % ACCENT_COLORS.length];
+
+                    return `
+                        <div class="curso-card" style="--accent-color:${color};">
+                            <div class="curso-accent"></div>
+                            <div class="curso-content">
+                                <div class="curso-codigo">CURSO #${cursoId}</div>
+                                <div class="curso-titulo">${escapeHtml(curso.nombre_curso)}</div>
+                                <div class="curso-meta">
+                                    <span>${escapeHtml(curso.estado || 'activo')}</span>
+                                    <span class="separador">|</span>
+                                    <span>${escapeHtml(curso.categoria || 'Sin categoría')}</span>
+                                    <span class="separador">|</span>
+                                    <span>${escapeHtml(curso.duracion_horas)} horas</span>
+                                    <span class="separador">|</span>
+                                    <span>Total: $${Number(curso.total_pago || 0).toFixed(2)}</span>
+                                </div>
+
+                                <div class="entregables-box">
+                                    <button id="entregables-toggle-${cursoId}" class="entregables-toggle" onclick="toggleEntregables(${cursoId})">
+                                        <span>Entregables y Tareas (${tareas.length})</span>
+                                        <span class="chevron">▼</span>
+                                    </button>
+                                    <div id="entregables-content-${cursoId}" class="entregables-content">
+                                        ${renderTareasCurso(cursoId, tareas)}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                document.getElementById('contenedor-cursos').innerHTML = '<div class="table-container" style="padding: 20px; text-align:center; color:#dc2626;">Error cargando cursos y tareas.</div>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarEstudiante()) {
+                cargarMisCursos();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

@@ -1,0 +1,153 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administrador</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page admin-dashboard">
+    <nav>
+        <h1>Panel de Administrador</h1>
+        <div class="nav-links">
+            <a href="/admin-dashboard/" class="active">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Bienvenido al Panel de Administración</h2>
+        
+        <div class="stats" id="stats-container">
+            <!-- Las estadísticas se cargarán con JavaScript -->
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card card-users">
+                <h3>Estudiantes</h3>
+                <p>Gestionar y ver todos los estudiantes registrados</p>
+                <a href="/estudiantes-page/">Ir a Estudiantes</a>
+            </div>
+
+            <div class="card card-users">
+                <h3>Instructores</h3>
+                <p>Crear instructores con usuario y contraseña</p>
+                <a href="/instructores-page/">Ir a Instructores</a>
+            </div>
+
+            <div class="card card-courses">
+                <h3>Cursos</h3>
+                <p>Crear, editar y gestionar cursos disponibles</p>
+                <a href="/cursos-page/">Ir a Cursos</a>
+            </div>
+
+            <div class="card card-enrollments">
+                <h3>Inscripciones</h3>
+                <p>Ver y procesar inscripciones de estudiantes</p>
+                <a href="/inscripciones-page/">Ir a Inscripciones</a>
+            </div>
+
+            <div class="card card-payments">
+                <h3>Pagos</h3>
+                <p>Consultar historial de pagos y métodos</p>
+                <a href="/pagos-page/">Ver Pagos</a>
+            </div>
+
+            <div class="card card-enrollments">
+                <h3>Asignación Docente</h3>
+                <p>Asignar cursos a profesores/instructores</p>
+                <a href="/asignacion-cursos-page/">Asignar Cursos</a>
+            </div>
+
+            <div class="card card-reports">
+                <h3>Reportes</h3>
+                <p>Generar reportes e indicadores de desempeño</p>
+                <a href="/reportes-page/">Ver Reportes</a>
+            </div>
+
+            <div class="card card-admin">
+                <h3>Administración</h3>
+                <p>Accede al panel de administración de Django</p>
+                <a href="/admin/">Panel Django Admin</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Cargar información del usuario
+        function cargarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role !== 'admin') {
+                alert('Acceso denegado. Solo administradores pueden acceder aquí.');
+                window.location.href = '/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = `Bienvenido, ${user.nombre}`;
+        }
+
+        // Logout
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        // Cargar estadísticas
+        async function cargarEstadisticas() {
+            try {
+                const [estudiantes, cursos, inscripciones, pagos] = await Promise.all([
+                    fetch('/api/estudiantes/').then(r => r.json()),
+                    fetch('/api/cursos/').then(r => r.json()),
+                    fetch('/api/inscripciones-por-mes/').then(r => r.json()),
+                    fetch('/api/pagos/').then(r => r.json())
+                ]);
+
+                const statsHtml = `
+                    <div class="stat-box">
+                        <div class="stat-number">${estudiantes.length}</div>
+                        <div class="stat-label">Estudiantes Registrados</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${cursos.length}</div>
+                        <div class="stat-label">Cursos Disponibles</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${inscripciones[0]?.abril || 0}</div>
+                        <div class="stat-label">Inscripciones (Abril)</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">${pagos.length}</div>
+                        <div class="stat-label">Transacciones de Pago</div>
+                    </div>
+                `;
+                
+                document.getElementById('stats-container').innerHTML = statsHtml;
+            } catch (error) {
+                console.error('Error cargando estadísticas:', error);
+            }
+        }
+
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarUsuario();
+            cargarEstadisticas();
+        });
+    </script>
+</body>
+</html>
+
+
+

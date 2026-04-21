@@ -1,0 +1,102 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Mis Calificaciones - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/">Menú</a>
+            <a href="/estudiante-mis-cursos/">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/" class="active">Calificaciones</a>
+            <a href="/estudiante-inscripcion/">Inscripción</a>
+            <a href="/estudiante-perfil/">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Mis Calificaciones</h2>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Tipo</th>
+                        <th>Eval. Manual</th>
+                        <th>Prom. Entregables</th>
+                        <th>Calificación Final (70/30)</th>
+                        <th>Comentarios</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-calificaciones">
+                    <tr><td colspan="7" style="text-align:center;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let usuarioData = {};
+
+        function verificarEstudiante() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'estudiante') {
+                window.location.href = '/';
+                return false;
+            }
+            usuarioData = user;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        async function cargarCalificaciones() {
+            try {
+                const evaluaciones = await fetch(`/api/evaluaciones-estudiante/?estudiante_id=${usuarioData.id}`).then(r => r.json());
+                const tbody = document.getElementById('tbody-calificaciones');
+
+                if (!Array.isArray(evaluaciones) || evaluaciones.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">No tienes calificaciones registradas</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = evaluaciones.map(ev => `
+                    <tr>
+                        <td>${ev.nombre_curso}</td>
+                        <td>${ev.tipo_evaluacion || 'final'}</td>
+                        <td>${ev.calificacion || 'N/A'}</td>
+                        <td>${ev.promedio_entregables !== null && ev.promedio_entregables !== undefined ? Number(ev.promedio_entregables).toFixed(2) : 'N/A'}</td>
+                        <td>${ev.calificacion_final !== null && ev.calificacion_final !== undefined ? Number(ev.calificacion_final).toFixed(2) : 'N/A'}</td>
+                        <td>${ev.comentarios || 'Sin comentarios'}</td>
+                        <td>${ev.fecha ? new Date(ev.fecha).toLocaleDateString() : 'N/A'}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                document.getElementById('tbody-calificaciones').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#e74c3c;">Error cargando calificaciones</td></tr>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarEstudiante()) {
+                cargarCalificaciones();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

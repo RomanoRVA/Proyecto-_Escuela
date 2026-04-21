@@ -1,0 +1,237 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inscripciones</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="javascript:void(0)" onclick="irAlDashboard()">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/" class="active">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Registrar Inscripción Completa</h2>
+        
+        <div class="form-container">
+            <div id="message" class="message"></div>
+            <div class="form-grid">
+                <select id="estudiante_id">
+                    <option value="">Seleccionar Estudiante</option>
+                </select>
+                <select id="curso_id">
+                    <option value="">Seleccionar Curso</option>
+                </select>
+                <input id="total_pago" placeholder="Total Pagado" type="number" step="0.01">
+                <input id="comentarios" placeholder="Comentarios">
+                <select id="metodo_id">
+                    <option value="">Seleccionar Método de Pago</option>
+                    <option value="1">Efectivo</option>
+                    <option value="2">Tarjeta</option>
+                    <option value="3">Transferencia</option>
+                </select>
+                <input id="referencia_pago" placeholder="Referencia de Pago">
+            </div>
+
+            <button class="btn btn-primary" onclick="procesarInscripcion()">Procesar Inscripción</button>
+        </div>
+
+        <h3 style="margin-top: 40px; margin-bottom: 20px; color: #2c3e50;">Inscripciones Registradas</h3>
+        <div class="table-container">
+            <table id="inscripcionesTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Estudiante</th>
+                        <th>Curso</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Total Pagado</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-inscripciones">
+                    <tr><td colspan="6" style="text-align: center; padding: 30px;">Cargando inscripciones...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarUsuario();
+            cargarOpciones();
+            cargarInscripciones();
+        });
+
+        function verificarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function irAlDashboard() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'admin') {
+                window.location.href = '/admin-dashboard/';
+            } else if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+            } else if (user.role === 'estudiante') {
+                window.location.href = '/estudiante-dashboard/';
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        async function cargarOpciones() {
+            try {
+                const [estudiantes, cursos] = await Promise.all([
+                    fetch('/api/estudiantes/').then(r => r.json()),
+                    fetch('/api/cursos/').then(r => r.json())
+                ]);
+
+                const estSelect = document.getElementById('estudiante_id');
+                estudiantes.forEach(e => {
+                    const option = document.createElement('option');
+                    option.value = e.estudiante_id;
+                    option.textContent = e.nombre_completo;
+                    estSelect.appendChild(option);
+                });
+
+                const curSelect = document.getElementById('curso_id');
+                cursos.forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.curso_id;
+                    option.textContent = `${c.nombre_curso} ($${c.costo})`;
+                    curSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        async function procesarInscripcion() {
+            const estudiante_id = document.getElementById('estudiante_id').value;
+            const curso_id = document.getElementById('curso_id').value;
+            const total_pago = document.getElementById('total_pago').value;
+            const comentarios = document.getElementById('comentarios').value;
+            const metodo_id = document.getElementById('metodo_id').value;
+            const referencia_pago = document.getElementById('referencia_pago').value;
+
+            if (!estudiante_id || !curso_id || !metodo_id) {
+                mostrarMensaje('Por favor selecciona estudiante, curso y método de pago', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/proceso-entero/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        estudiante_id,
+                        curso_id,
+                        calificacion: null,
+                        total_pago: total_pago || null,
+                        comentarios,
+                        metodo_id,
+                        referencia_pago
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarMensaje('Inscripción procesada exitosamente', 'success');
+                    document.getElementById('estudiante_id').value = '';
+                    document.getElementById('curso_id').value = '';
+                    document.getElementById('total_pago').value = '';
+                    document.getElementById('comentarios').value = '';
+                    document.getElementById('metodo_id').value = '';
+                    document.getElementById('referencia_pago').value = '';
+                    // Recargar la lista de inscripciones
+                    cargarInscripciones();
+                } else {
+                    mostrarMensaje('Error: ' + result.message, 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error procesando inscripción', 'error');
+                console.error(error);
+            }
+        }
+
+        function mostrarMensaje(texto, tipo) {
+            const msgEl = document.getElementById('message');
+            msgEl.textContent = texto;
+            msgEl.className = 'message ' + tipo;
+            msgEl.style.display = 'block';
+            setTimeout(() => {
+                msgEl.style.display = 'none';
+            }, 5000);
+        }
+
+        async function cargarInscripciones() {
+            try {
+                const response = await fetch('/api/inscripciones-list/');
+                const inscripciones = await response.json();
+                
+                const tbody = document.getElementById('tbody-inscripciones');
+                tbody.innerHTML = '';
+                
+                if (inscripciones.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px;">No hay inscripciones registradas</td></tr>';
+                    return;
+                }
+                
+                inscripciones.forEach(inscripcion => {
+                    const estadoClass = `badge-${inscripcion.estado}`;
+                    const estadoText = inscripcion.estado.charAt(0).toUpperCase() + inscripcion.estado.slice(1);
+                    
+                    const row = `
+                        <tr>
+                            <td>${inscripcion.inscripcion_id}</td>
+                            <td>${inscripcion.estudiante}</td>
+                            <td>${inscripcion.curso}</td>
+                            <td>${new Date(inscripcion.fecha_inscripcion).toLocaleDateString()}</td>
+                            <td><span class="badge ${estadoClass}">${estadoText}</span></td>
+                            <td>$${inscripcion.total_pago}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error('Error cargando inscripciones:', error);
+                const tbody = document.getElementById('tbody-inscripciones');
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 30px; color: #e74c3c;">Error al cargar las inscripciones</td></tr>';
+            }
+        }
+    </script>
+</body>
+</html>
+
+

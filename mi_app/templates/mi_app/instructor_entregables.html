@@ -1,0 +1,326 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entregables - Instructor</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Instructor</h1>
+        <div class="nav-links">
+            <a href="/instructor-dashboard/">Menú</a>
+            <a href="/instructor-cursos/">Cursos</a>
+            <a href="/instructor-alumnos/">Alumnos</a>
+            <a href="/instructor-calificaciones/">Calificaciones</a>
+            <a href="/instructor-entregables/" class="active">Entregables</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Gestión de Entregables</h2>
+
+        <div id="message" class="message"></div>
+
+        <div class="form-container" style="display:block;">
+            <h3 style="margin-bottom: 16px;">Crear Nuevo Entregable</h3>
+            <div class="form-grid">
+                <select id="curso_id"></select>
+                <input id="titulo" type="text" placeholder="Título del entregable">
+                <input id="fecha_limite" type="datetime-local">
+                <input id="puntaje_maximo" type="number" step="0.01" min="1" value="100" placeholder="Puntaje máximo">
+                <select id="permite_entrega_tardia">
+                    <option value="false">No permitir entrega tardía</option>
+                    <option value="true">Permitir entrega tardía</option>
+                </select>
+                <textarea id="descripcion" rows="3" placeholder="Descripción"></textarea>
+            </div>
+            <div style="margin-top: 14px; display:flex; gap:10px;">
+                <button class="btn btn-primary" onclick="crearEntregable()">Guardar Entregable</button>
+                <button class="btn btn-secondary" onclick="limpiarFormulario()">Limpiar</button>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 8px; margin-bottom: 14px;">Mis Entregables</h3>
+        <div class="table-container" style="margin-bottom: 24px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Curso</th>
+                        <th>Título</th>
+                        <th>Fecha Límite</th>
+                        <th>Puntaje</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-entregables">
+                    <tr><td colspan="7" style="text-align:center; padding:24px;">Cargando entregables...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3 style="margin-bottom: 14px;">Entregas del Entregable Seleccionado</h3>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Estudiante</th>
+                        <th>Fecha Entrega</th>
+                        <th>Estado</th>
+                        <th>Archivo</th>
+                        <th>Calificación</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-entregas">
+                    <tr><td colspan="7" style="text-align:center; padding:24px;">Selecciona un entregable para ver entregas</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let instructorId = null;
+        let entregableActivoId = null;
+
+        function mostrarMensaje(texto, tipo) {
+            const msg = document.getElementById('message');
+            msg.textContent = texto;
+            msg.className = `message ${tipo}`;
+            msg.style.display = 'block';
+            setTimeout(() => {
+                msg.style.display = 'none';
+            }, 4500);
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function verificarInstructor() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'instructor') {
+                window.location.href = '/';
+                return false;
+            }
+            instructorId = user.id;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function limpiarFormulario() {
+            document.getElementById('titulo').value = '';
+            document.getElementById('descripcion').value = '';
+            document.getElementById('fecha_limite').value = '';
+            document.getElementById('puntaje_maximo').value = '100';
+            document.getElementById('permite_entrega_tardia').value = 'false';
+        }
+
+        async function cargarCursosInstructor() {
+            const cursoSelect = document.getElementById('curso_id');
+            cursoSelect.innerHTML = '<option value="">Seleccionar curso</option>';
+            try {
+                const data = await fetch('/api/curso-instructor/').then(r => r.json());
+                const cursos = Array.isArray(data)
+                    ? data.filter(item => Number(item.instructor_id) === Number(instructorId))
+                    : [];
+
+                if (cursos.length === 0) {
+                    cursoSelect.innerHTML = '<option value="">No tienes cursos asignados</option>';
+                    return;
+                }
+
+                cursos.forEach(curso => {
+                    const option = document.createElement('option');
+                    option.value = curso.curso_id;
+                    option.textContent = curso.nombre_curso;
+                    cursoSelect.appendChild(option);
+                });
+            } catch (error) {
+                cursoSelect.innerHTML = '<option value="">Error cargando cursos</option>';
+            }
+        }
+
+        async function crearEntregable() {
+            const curso_id = document.getElementById('curso_id').value;
+            const titulo = document.getElementById('titulo').value.trim();
+            const descripcion = document.getElementById('descripcion').value.trim();
+            const fecha_limite_local = document.getElementById('fecha_limite').value;
+            const puntaje_maximo = document.getElementById('puntaje_maximo').value;
+            const permite_entrega_tardia = document.getElementById('permite_entrega_tardia').value === 'true';
+
+            if (!curso_id || !titulo || !fecha_limite_local || !puntaje_maximo) {
+                mostrarMensaje('Completa los campos obligatorios', 'error');
+                return;
+            }
+
+            // Enviamos hora local para evitar desfases de zona horaria en SQL Server.
+            const fecha_limite = `${fecha_limite_local}:00`;
+
+            try {
+                const response = await fetch('/api/entregables/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        curso_id,
+                        titulo,
+                        descripcion,
+                        fecha_limite,
+                        puntaje_maximo,
+                        permite_entrega_tardia
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    mostrarMensaje('Entregable creado correctamente', 'success');
+                    limpiarFormulario();
+                    cargarEntregables();
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo crear el entregable', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al crear entregable', 'error');
+            }
+        }
+
+        function formatearFecha(valor) {
+            if (!valor) return '-';
+            const fecha = new Date(valor);
+            if (Number.isNaN(fecha.getTime())) return valor;
+            return fecha.toLocaleString();
+        }
+
+        function badgeEstado(valor) {
+            const estado = (valor || '').toLowerCase();
+            return `<span class="badge badge-${estado}">${valor || '-'}</span>`;
+        }
+
+        async function cargarEntregables() {
+            const tbody = document.getElementById('tbody-entregables');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px;">Cargando...</td></tr>';
+            try {
+                const data = await fetch(`/api/entregables/instructor/?instructor_id=${instructorId}`).then(r => r.json());
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px;">No tienes entregables creados</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => `
+                    <tr>
+                        <td>#${item.entregable_id}</td>
+                        <td>${item.nombre_curso || item.curso_id}</td>
+                        <td>${item.titulo}</td>
+                        <td>${formatearFecha(item.fecha_limite)}</td>
+                        <td>${parseFloat(item.puntaje_maximo || 0).toFixed(2)}</td>
+                        <td>${badgeEstado(item.estado)}</td>
+                        <td>
+                            <div class="table-actions">
+                                <button class="btn btn-edit" onclick="cargarEntregas(${item.entregable_id})">Ver Entregas</button>
+                            </div>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626; padding:24px;">Error cargando entregables</td></tr>';
+            }
+        }
+
+        async function cargarEntregas(entregableId) {
+            entregableActivoId = entregableId;
+            const tbody = document.getElementById('tbody-entregas');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px;">Cargando entregas...</td></tr>';
+
+            try {
+                const data = await fetch(`/api/entregas/por-entregable/?instructor_id=${instructorId}&entregable_id=${entregableId}`).then(r => r.json());
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px;">Aún no hay entregas para este entregable</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.map(item => {
+                    const archivoLink = item.archivo_ruta
+                        ? `<a href="/media/${item.archivo_ruta}" target="_blank" rel="noopener">${item.archivo_nombre_original || 'Ver archivo'}</a>`
+                        : '-';
+                    const calif = item.calificacion !== null && item.calificacion !== undefined ? item.calificacion : '';
+
+                    return `
+                        <tr>
+                            <td>#${item.entrega_id}</td>
+                            <td>${item.nombre_estudiante}</td>
+                            <td>${formatearFecha(item.fecha_entrega)}</td>
+                            <td>${badgeEstado(item.estado_entrega)}</td>
+                            <td>${archivoLink}</td>
+                            <td>${calif === '' ? '-' : calif}</td>
+                            <td>
+                                <div class="table-actions">
+                                    <button class="btn btn-primary" onclick="calificarEntrega(${item.entrega_id})">Calificar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#dc2626; padding:24px;">Error cargando entregas</td></tr>';
+            }
+        }
+
+        async function calificarEntrega(entregaId) {
+            const calificacion = prompt('Calificación (0-100):', '');
+            if (calificacion === null) return;
+
+            const calNum = parseFloat(calificacion);
+            if (Number.isNaN(calNum) || calNum < 0 || calNum > 100) {
+                mostrarMensaje('La calificación debe estar entre 0 y 100', 'error');
+                return;
+            }
+
+            const retroalimentacion = prompt('Retroalimentación:', '') || '';
+
+            try {
+                const response = await fetch('/api/entregas/calificar/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        instructor_id: instructorId,
+                        entrega_id: entregaId,
+                        calificacion: calNum,
+                        retroalimentacion
+                    })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    mostrarMensaje('Entrega calificada correctamente', 'success');
+                    await cargarEntregables();
+                    if (entregableActivoId) {
+                        await cargarEntregas(entregableActivoId);
+                    }
+                } else {
+                    mostrarMensaje(result.message || 'No se pudo calificar', 'error');
+                }
+            } catch (error) {
+                mostrarMensaje('Error de conexión al calificar', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!verificarInstructor()) return;
+            await cargarCursosInstructor();
+            await cargarEntregables();
+        });
+    </script>
+</body>
+</html>

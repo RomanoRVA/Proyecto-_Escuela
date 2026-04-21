@@ -1,0 +1,500 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Pagos</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Gestión de Pagos</h1>
+        <div class="nav-links">
+            <a href="/admin-dashboard/">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/" class="active">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="alert alert-success" id="success-alert"></div>
+        <div class="alert alert-error" id="error-alert"></div>
+
+        <div class="stats" id="stats-container">
+            <div class="stat-box">
+                <div class="stat-number" id="stat-total-pagos">0</div>
+                <div class="stat-label">Total de Pagos</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="stat-monto-total">$0.00</div>
+                <div class="stat-label">Monto Total Pagado</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="stat-pendiente">0</div>
+                <div class="stat-label">Inscripciones Pendientes</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="cambiarTab('tab-pagos')">Pagos Registrados</button>
+            <button class="tab-button" onclick="cambiarTab('tab-nuevo-pago')">Registrar Nuevo Pago</button>
+        </div>
+
+        <!-- Tab: Pagos Registrados -->
+        <div id="tab-pagos" class="tab-content active">
+            <div class="filter-box">
+                <label for="estudiante-filter">Filtrar por Estudiante:</label>
+                <input type="text" id="estudiante-filter" placeholder="Ingrese nombre del estudiante..." onkeyup="filtrarPagos()">
+            </div>
+
+            <div class="spinner" id="spinner">⏳ Cargando...</div>
+
+            <div class="table-container">
+                <table id="pagos-table">
+                    <thead>
+                        <tr>
+                            <th>ID Pago</th>
+                            <th>Estudiante</th>
+                            <th>Curso</th>
+                            <th>Método de Pago</th>
+                            <th>Monto Pagado</th>
+                            <th>Total a Pagar</th>
+                            <th>Fecha de Pago</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabla-pagos-body">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab: Nuevo Pago -->
+        <div id="tab-nuevo-pago" class="tab-content">
+            <div class="filter-box">
+                <label for="inscripcion-select">Seleccionar Inscripción:</label>
+                <select id="inscripcion-select" onchange="cargarDetallesInscripcion()">
+                    <option value="">-- Seleccione una inscripción pendiente --</option>
+                </select>
+            </div>
+
+            <div class="table-container" style="display: none;" id="detalles-container">
+                <div style="padding: 20px;">
+                    <h3>Detalles de la Inscripción</h3>
+                    <table>
+                        <tr>
+                            <td><strong>Estudiante:</strong></td>
+                            <td id="detalle-estudiante">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Curso:</strong></td>
+                            <td id="detalle-curso">-</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Monto Total:</strong></td>
+                            <td id="detalle-monto">$0.00</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fecha de Inscripción:</strong></td>
+                            <td id="detalle-fecha">-</td>
+                        </tr>
+                    </table>
+
+                    <h3 style="margin-top: 30px; margin-bottom: 15px;">Registro de Nuevo Pago</h3>
+                    <form id="forma-nuevo-pago">
+                        <div class="form-group">
+                            <label for="metodo-pago">Método de Pago:</label>
+                            <select id="metodo-pago" required>
+                                <option value="">-- Seleccione un método --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="monto-pago">Monto a Pagar ($):</label>
+                            <input type="number" id="monto-pago" step="0.01" min="0" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="referencia-pago">Referencia de Pago (opcional):</label>
+                            <input type="text" id="referencia-pago" placeholder="Ej: Número de transacción, cheque, etc.">
+                        </div>
+
+                        <div class="button-group">
+                            <button type="button" class="btn-close" onclick="limpiarFormularioPago()">Limpiar</button>
+                            <button type="button" class="btn-save" onclick="guardarPago()">Guardar Pago</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar pago -->
+    <div id="modal-editar-pago" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Editar Pago</div>
+            <form id="forma-editar-pago">
+                <input type="hidden" id="editar-pago-id">
+
+                <div class="form-group">
+                    <label><strong>Estudiante:</strong></label>
+                    <div style="padding: 10px; background: #ecf0f1; border-radius: 4px;" id="editar-estudiante">-</div>
+                </div>
+
+                <div class="form-group">
+                    <label><strong>Curso:</strong></label>
+                    <div style="padding: 10px; background: #ecf0f1; border-radius: 4px;" id="editar-curso">-</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="editar-metodo-pago">Método de Pago:</label>
+                    <select id="editar-metodo-pago" required>
+                        <option value="">-- Seleccione un método --</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="editar-monto-pago">Monto ($):</label>
+                    <input type="number" id="editar-monto-pago" step="0.01" min="0" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="editar-referencia-pago">Referencia de Pago:</label>
+                    <input type="text" id="editar-referencia-pago" placeholder="Ej: Número de transacción, cheque, etc.">
+                </div>
+
+                <div class="button-group">
+                    <button type="button" class="btn-close" onclick="cerrarModalEditar()">Cancelar</button>
+                    <button type="button" class="btn-save" onclick="actualizarPago()">Actualizar Pago</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let pagosActuales = [];
+        let inscripcionesActuales = [];
+        let metodosActuales = [];
+        let pagoEnEdicion = null;
+
+        // Funciones de interfaz
+        function cambiarTab(tabId) {
+            // Ocultar todos los tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+
+            // Mostrar el tab seleccionado
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+
+            // Cargar datos si es necesario
+            if (tabId === 'tab-pagos') {
+                cargarPagos();
+            } else if (tabId === 'tab-nuevo-pago') {
+                cargarInscripcionesPendientes();
+                cargarMetodosPago();
+            }
+        }
+
+        function showAlert(message, type) {
+            const alertId = type === 'success' ? 'success-alert' : 'error-alert';
+            const alertEl = document.getElementById(alertId);
+            alertEl.textContent = message;
+            alertEl.style.display = 'block';
+            setTimeout(() => alertEl.style.display = 'none', 5000);
+        }
+
+        function mostrarSpinner(mostrar) {
+            document.getElementById('spinner').classList.toggle('active', mostrar);
+        }
+
+        // Funciones de carga de datos
+        function cargarPagos() {
+            mostrarSpinner(true);
+            fetch('/pagos-admin-list/')
+                .then(response => response.json())
+                .then(data => {
+                    pagosActuales = data;
+                    mostrarSpinner(false);
+                    actualizarTablaPagos(data);
+                    actualizarEstadisticas();
+                })
+                .catch(error => {
+                    mostrarSpinner(false);
+                    showAlert('Error al cargar pagos: ' + error, 'error');
+                });
+        }
+
+        function cargarInscripcionesPendientes() {
+            mostrarSpinner(true);
+            fetch('/inscripciones-sin-pago/')
+                .then(response => response.json())
+                .then(data => {
+                    inscripcionesActuales = data;
+                    mostrarSpinner(false);
+                    actualizarSelectInscripciones(data);
+                    actualizarEstadisticas();
+                })
+                .catch(error => {
+                    mostrarSpinner(false);
+                    showAlert('Error al cargar inscripciones: ' + error, 'error');
+                });
+        }
+
+        function cargarMetodosPago() {
+            fetch('/metodos-pago/')
+                .then(response => response.json())
+                .then(data => {
+                    metodosActuales = data;
+                    actualizarSelectMetodos('metodo-pago', data);
+                    actualizarSelectMetodos('editar-metodo-pago', data);
+                })
+                .catch(error => showAlert('Error al cargar métodos de pago: ' + error, 'error'));
+        }
+
+        function actualizarSelectInscripciones(inscripciones) {
+            const select = document.getElementById('inscripcion-select');
+            select.innerHTML = '<option value="">-- Seleccione una inscripción pendiente --</option>';
+            inscripciones.forEach(insc => {
+                const option = document.createElement('option');
+                option.value = insc.inscripcion_id;
+                option.dataset.estudiante = insc.nombre_estudiante;
+                option.dataset.curso = insc.nombre_curso;
+                option.dataset.monto = insc.monto_pendiente;
+                option.dataset.fecha = insc.fecha_inscripcion;
+                option.text = `${insc.nombre_estudiante} - ${insc.nombre_curso} ($${parseFloat(insc.monto_pendiente).toFixed(2)})`;
+                select.appendChild(option);
+            });
+        }
+
+        function actualizarSelectMetodos(selectId, metodos) {
+            const select = document.getElementById(selectId);
+            const opciones = select.querySelectorAll('option');
+            const selectedValue = select.value;
+
+            metodos.forEach(metodo => {
+                let option = select.querySelector(`option[value="${metodo.metodo_id}"]`);
+                if (!option) {
+                    option = document.createElement('option');
+                    select.appendChild(option);
+                }
+                option.value = metodo.metodo_id;
+                option.text = metodo.nombre;
+            });
+
+            if (selectedValue) select.value = selectedValue;
+        }
+
+        function actualizarTablaPagos(pagos) {
+            const tbody = document.getElementById('tabla-pagos-body');
+            tbody.innerHTML = '';
+
+            pagos.forEach(pago => {
+                const montoPagado = parseFloat(pago.monto_pagado);
+                const montoTotal = parseFloat(pago.monto_total);
+                let estado = 'Parcial';
+                if (montoPagado >= montoTotal) estado = 'Pagado';
+                if (montoPagado === 0) estado = 'Pendiente';
+
+                const fila = document.createElement('tr');
+                fila.innerHTML = `
+                    <td>${pago.pago_id}</td>
+                    <td>${pago.nombre_estudiante}</td>
+                    <td>${pago.nombre_curso}</td>
+                    <td>${pago.metodo_pago}</td>
+                    <td>$${montoPagado.toFixed(2)}</td>
+                    <td>$${montoTotal.toFixed(2)}</td>
+                    <td>${new Date(pago.fecha_pago).toLocaleDateString('es-ES')}</td>
+                    <td><span class="status-badge status-${estado.toLowerCase()}">${estado}</span></td>
+                    <td>
+                        <button class="btn-edit" onclick="abrirModalEditar(${pago.pago_id})">Editar</button>
+                    </td>
+                `;
+                tbody.appendChild(fila);
+            });
+
+            if (pagos.length === 0) {
+                const fila = document.createElement('tr');
+                fila.innerHTML = '<td colspan="9" style="text-align: center; color: #7f8c8d;">No hay pagos registrados</td>';
+                tbody.appendChild(fila);
+            }
+        }
+
+        function actualizarEstadisticas() {
+            const totalPagos = pagosActuales.length;
+            const montoTotal = pagosActuales.reduce((sum, p) => sum + parseFloat(p.monto_pagado || 0), 0);
+            const pendientes = inscripcionesActuales.length;
+
+            document.getElementById('stat-total-pagos').textContent = totalPagos;
+            document.getElementById('stat-monto-total').textContent = '$' + montoTotal.toFixed(2);
+            document.getElementById('stat-pendiente').textContent = pendientes;
+        }
+
+        function filtrarPagos() {
+            const filtro = document.getElementById('estudiante-filter').value.toLowerCase();
+            const pagosFiltridos = pagosActuales.filter(p =>
+                p.nombre_estudiante.toLowerCase().includes(filtro) ||
+                p.nombre_curso.toLowerCase().includes(filtro)
+            );
+            actualizarTablaPagos(pagosFiltridos);
+        }
+
+        // Funciones de formulario
+        function cargarDetallesInscripcion() {
+            const select = document.getElementById('inscripcion-select');
+            const option = select.options[select.selectedIndex];
+
+            if (!option.value) {
+                document.getElementById('detalles-container').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('detalle-estudiante').textContent = option.dataset.estudiante;
+            document.getElementById('detalle-curso').textContent = option.dataset.curso;
+            document.getElementById('detalle-monto').textContent = '$' + parseFloat(option.dataset.monto).toFixed(2);
+            document.getElementById('detalle-fecha').textContent = new Date(option.dataset.fecha).toLocaleDateString('es-ES');
+            document.getElementById('monto-pago').value = option.dataset.monto;
+            document.getElementById('monto-pago').max = option.dataset.monto;
+            document.getElementById('detalles-container').style.display = 'block';
+        }
+
+        function limpiarFormularioPago() {
+            document.getElementById('inscripcion-select').value = '';
+            document.getElementById('metodo-pago').value = '';
+            document.getElementById('monto-pago').value = '';
+            document.getElementById('referencia-pago').value = '';
+            document.getElementById('detalles-container').style.display = 'none';
+        }
+
+        function guardarPago() {
+            const inscripcion_id = document.getElementById('inscripcion-select').value;
+            const metodo_id = document.getElementById('metodo-pago').value;
+            const monto = document.getElementById('monto-pago').value;
+            const referencia_pago = document.getElementById('referencia-pago').value;
+
+            if (!inscripcion_id || !metodo_id || !monto) {
+                showAlert('Por favor complete todos los campos requeridos', 'error');
+                return;
+            }
+
+            mostrarSpinner(true);
+            fetch('/crear-pago/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    inscripcion_id: parseInt(inscripcion_id),
+                    metodo_id: parseInt(metodo_id),
+                    monto: parseFloat(monto),
+                    referencia_pago: referencia_pago
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    mostrarSpinner(false);
+                    if (data.success) {
+                        showAlert(data.message, 'success');
+                        limpiarFormularioPago();
+                        cargarPagos();
+                        cargarInscripcionesPendientes();
+                    } else {
+                        showAlert(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    mostrarSpinner(false);
+                    showAlert('Error: ' + error, 'error');
+                });
+        }
+
+        function abrirModalEditar(pagoId) {
+            const pago = pagosActuales.find(p => p.pago_id === pagoId);
+            if (!pago) return;
+
+            pagoEnEdicion = pago;
+            document.getElementById('editar-pago-id').value = pago.pago_id;
+            document.getElementById('editar-estudiante').textContent = pago.nombre_estudiante;
+            document.getElementById('editar-curso').textContent = pago.nombre_curso;
+            document.getElementById('editar-metodo-pago').value = '';
+            document.getElementById('editar-monto-pago').value = pago.monto_pagado;
+            document.getElementById('editar-referencia-pago').value = pago.referencia_pago || '';
+            document.getElementById('modal-editar-pago').style.display = 'block';
+        }
+
+        function cerrarModalEditar() {
+            document.getElementById('modal-editar-pago').style.display = 'none';
+            pagoEnEdicion = null;
+        }
+
+        function actualizarPago() {
+            const pago_id = parseInt(document.getElementById('editar-pago-id').value);
+            const metodo_id = document.getElementById('editar-metodo-pago').value;
+            const monto = document.getElementById('editar-monto-pago').value;
+            const referencia_pago = document.getElementById('editar-referencia-pago').value;
+
+            if (!metodo_id || !monto) {
+                showAlert('Por favor complete todos los campos requeridos', 'error');
+                return;
+            }
+
+            mostrarSpinner(true);
+            fetch('/actualizar-pago/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pago_id: pago_id,
+                    metodo_id: parseInt(metodo_id),
+                    monto: parseFloat(monto),
+                    referencia_pago: referencia_pago
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    mostrarSpinner(false);
+                    if (data.success) {
+                        showAlert(data.message, 'success');
+                        cerrarModalEditar();
+                        cargarPagos();
+                    } else {
+                        showAlert(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    mostrarSpinner(false);
+                    showAlert('Error: ' + error, 'error');
+                });
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            window.location.href = '/';
+        }
+
+        // Cargar datos al iniciar
+        document.addEventListener('DOMContentLoaded', function () {
+            cargarPagos();
+            cargarMetodosPago();
+        });
+
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function (event) {
+            const modal = document.getElementById('modal-editar-pago');
+            if (event.target === modal) {
+                cerrarModalEditar();
+            }
+        };
+    </script>
+</body>
+</html>
+
+
+

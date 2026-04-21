@@ -1,0 +1,482 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agregar Calificaciones</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <div>
+            <h1>Agregar Calificaciones</h1>
+        </div>
+        <div class="nav-links">
+            <a href="/instructor-dashboard/">Menú</a>
+            <a href="/instructor-cursos/">Cursos</a>
+            <a href="/instructor-alumnos/">Alumnos</a>
+            <a href="/instructor-calificaciones/" class="active">Calificaciones</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="alert alert-success" id="success-alert"></div>
+        <div class="alert alert-error" id="error-alert"></div>
+
+        <div class="filter-box">
+            <label for="curso-filter">Seleccionar Curso:</label>
+            <select id="curso-filter" onchange="filtrarPorCurso()">
+                <option value="">-- Todos los cursos --</option>
+            </select>
+        </div>
+
+        <button class="btn-add" onclick="abrirModalCalificacion()">Agregar Nueva Calificación</button>
+
+        <div class="spinner" id="spinner">⏳ Cargando...</div>
+
+        <div class="table-container">
+            <table id="calificaciones-table">
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Curso</th>
+                        <th>Tipo Evaluación</th>
+                        <th>Eval. Manual</th>
+                        <th>Prom. Entregables</th>
+                        <th>Calificación Final (70/30)</th>
+                        <th>Comentarios</th>
+                        <th>Última Actualización</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tabla-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Modal para agregar/editar calificación -->
+    <div id="calificacion-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">Agregar/Editar Calificación</div>
+            
+            <div class="form-group">
+                <label for="modal-estudiante">Estudiante:</label>
+                <select id="modal-estudiante">
+                    <option value="">Seleccionar estudiante...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="modal-curso">Curso:</label>
+                <select id="modal-curso">
+                    <option value="">Seleccionar curso...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="modal-tipo">Tipo de Evaluación:</label>
+                <select id="modal-tipo" required>
+                    <option value="final">Final</option>
+                    <option value="parcial">Parcial</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="modal-calificacion">Calificación (0-100):</label>
+                <input type="number" id="modal-calificacion" min="0" max="100" step="0.01" required>
+            </div>
+
+            <div class="form-group">
+                <label for="modal-comentarios">Comentarios:</label>
+                <textarea id="modal-comentarios" placeholder="Comentarios opcionales..."></textarea>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-close" onclick="cerrarModalCalificacion()">Cancelar</button>
+                <button class="btn-save" onclick="guardarCalificacion()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Obtener información del usuario desde localStorage
+        let user = JSON.parse(localStorage.getItem('user') || '{}');
+        let instructorId = user.id;
+        let calificacionesActuales = [];
+        let calificacionSeleccionada = null;
+
+        // Si no hay instructor_id o no es instructor, redirigir al login
+        if (!instructorId || user.role !== 'instructor') {
+            window.location.href = '/';
+        }
+        document.getElementById('usuario-nombre').textContent = user.nombre || '';
+
+        // Cargar calificaciones al abrir la página
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarCalificaciones();
+        });
+
+        function cargarCalificaciones() {
+            document.getElementById('spinner').classList.add('active');
+            fetch(`/calificaciones-instructor/?instructor_id=${instructorId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`Error ${response.status}: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success === false) {
+                        mostrarError(`Error: ${data.error || data.message || 'Error desconocido'}`);
+                        console.error('Error de API:', data);
+                        calificacionesActuales = [];
+                    } else if (Array.isArray(data)) {
+                        calificacionesActuales = data;
+                        mostrarCalificaciones(data);
+                        cargarCursos(data);
+                    } else {
+                        mostrarError('Formato de respuesta inválido');
+                        calificacionesActuales = [];
+                    }
+                    document.getElementById('spinner').classList.remove('active');
+                })
+                .catch(error => {
+                    mostrarError('Error al cargar las calificaciones: ' + error.message);
+                    console.error('Error:', error);
+                    calificacionesActuales = [];
+                    document.getElementById('spinner').classList.remove('active');
+                });
+        }
+
+        function mostrarCalificaciones(data) {
+            const tbody = document.getElementById('tabla-body');
+            tbody.innerHTML = '';
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 20px;">No hay inscripciones disponibles</td></tr>';
+                return;
+            }
+
+            data.forEach(item => {
+                const calificacion = item.calificacion ? parseFloat(item.calificacion) : null;
+                let caliBadge = '<span class="sin-calificacion">Sin calificar</span>';
+                
+                if (calificacion !== null) {
+                    if (calificacion >= 90) {
+                        caliBadge = `<span class="calificacion-badge excelente">${calificacion.toFixed(2)}</span>`;
+                    } else if (calificacion >= 80) {
+                        caliBadge = `<span class="calificacion-badge bueno">${calificacion.toFixed(2)}</span>`;
+                    } else if (calificacion >= 70) {
+                        caliBadge = `<span class="calificacion-badge regular">${calificacion.toFixed(2)}</span>`;
+                    } else {
+                        caliBadge = `<span class="calificacion-badge deficiente">${calificacion.toFixed(2)}</span>`;
+                    }
+                }
+
+                const comentarios = item.comentarios ? item.comentarios.substring(0, 30) + (item.comentarios.length > 30 ? '...' : '') : 'Sin comentarios';
+                const fechaAct = item.fecha_actualizacion ? new Date(item.fecha_actualizacion).toLocaleDateString() : 'N/A';
+                const promedioEntregables = item.promedio_entregables !== null && item.promedio_entregables !== undefined
+                    ? Number(item.promedio_entregables).toFixed(2)
+                    : 'N/A';
+
+                const finalNum = item.calificacion_final !== null && item.calificacion_final !== undefined
+                    ? Number(item.calificacion_final)
+                    : null;
+
+                let finalBadge = '<span class="sin-calificacion">Sin final</span>';
+                if (finalNum !== null) {
+                    if (finalNum >= 90) {
+                        finalBadge = `<span class="calificacion-badge excelente">${finalNum.toFixed(2)}</span>`;
+                    } else if (finalNum >= 80) {
+                        finalBadge = `<span class="calificacion-badge bueno">${finalNum.toFixed(2)}</span>`;
+                    } else if (finalNum >= 70) {
+                        finalBadge = `<span class="calificacion-badge regular">${finalNum.toFixed(2)}</span>`;
+                    } else {
+                        finalBadge = `<span class="calificacion-badge deficiente">${finalNum.toFixed(2)}</span>`;
+                    }
+                }
+
+                const row = `
+                    <tr>
+                        <td>${item.nombre_estudiante}</td>
+                        <td>${item.nombre_curso}</td>
+                        <td>${item.tipo_evaluacion === 'final' ? 'Final' : 'Parcial'}</td>
+                        <td>${caliBadge}</td>
+                        <td>${promedioEntregables}</td>
+                        <td>${finalBadge}</td>
+                        <td>${comentarios}</td>
+                        <td>${fechaAct}</td>
+                        <td>
+                            <button class="btn-edit" onclick="editarCalificacion(${item.inscripcion_id}, '${item.nombre_estudiante}', '${item.nombre_curso}')">
+                                Editar
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+        }
+
+        function cargarCursos(data) {
+            const select = document.getElementById('curso-filter');
+            // Obtener cursos únicos de todas las inscripciones disponibles
+            const cursos = [...new Set(data.map(item => item.nombre_curso))];
+            
+            // Limpiar opciones existentes excepto la primera
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            
+            cursos.forEach(curso => {
+                const option = document.createElement('option');
+                option.value = curso;
+                option.textContent = curso;
+                select.appendChild(option);
+            });
+        }
+
+        function filtrarPorCurso() {
+            const cursoFilter = document.getElementById('curso-filter').value;
+            
+            if (cursoFilter === '') {
+                mostrarCalificaciones(calificacionesActuales);
+            } else {
+                const filtrado = calificacionesActuales.filter(item => item.nombre_curso === cursoFilter);
+                mostrarCalificaciones(filtrado);
+            }
+        }
+
+        function abrirModalCalificacion() {
+            if (!calificacionesActuales || calificacionesActuales.length === 0) {
+                mostrarError('No hay estudiantes inscritos en tus cursos disponibles para calificar');
+                return;
+            }
+            
+            calificacionSeleccionada = null;
+            document.getElementById('modal-calificacion').value = '';
+            document.getElementById('modal-comentarios').value = '';
+            document.getElementById('modal-tipo').value = 'final';
+            
+            // Llenar selects con todos los estudiantes y cursos disponibles
+            const selectEstudiante = document.getElementById('modal-estudiante');
+            const selectCurso = document.getElementById('modal-curso');
+            
+            // Limpiar opciones previas
+            selectEstudiante.innerHTML = '<option value="">Seleccionar estudiante...</option>';
+            selectCurso.innerHTML = '<option value="">Seleccionar curso...</option>';
+            
+            // Poblar estudiantes únicos (todos los inscritos en cursos del instructor)
+            const estudiantes = [];
+            const estudiantesMap = new Map();
+            calificacionesActuales.forEach(item => {
+                if (!estudiantesMap.has(item.inscripcion_id)) {
+                    estudiantesMap.set(item.inscripcion_id, {
+                        inscripcion_id: item.inscripcion_id,
+                        nombre: item.nombre_estudiante,
+                        curso_id: item.curso_id,
+                        nombre_curso: item.nombre_curso
+                    });
+                    estudiantes.push(estudiantesMap.get(item.inscripcion_id));
+                }
+            });
+            
+            // Poblar cursos únicos
+            const cursos = [];
+            const cursosMap = new Map();
+            calificacionesActuales.forEach(item => {
+                if (!cursosMap.has(item.curso_id)) {
+                    cursosMap.set(item.curso_id, {
+                        id: item.curso_id,
+                        nombre: item.nombre_curso
+                    });
+                    cursos.push(cursosMap.get(item.curso_id));
+                }
+            });
+            
+            estudiantes.forEach(est => {
+                const option = document.createElement('option');
+                option.value = est.inscripcion_id;
+                option.textContent = `${est.nombre} (${est.nombre_curso})`;
+                selectEstudiante.appendChild(option);
+            });
+            
+            cursos.forEach(curso => {
+                const option = document.createElement('option');
+                option.value = curso.id;
+                option.textContent = curso.nombre;
+                selectCurso.appendChild(option);
+            });
+            
+            document.getElementById('calificacion-modal').style.display = 'block';
+        }
+
+        function editarCalificacion(inscripcionId, nombreEstudiante, nombreCurso) {
+            calificacionSeleccionada = calificacionesActuales.find(item => item.inscripcion_id === inscripcionId);
+            
+            if (calificacionSeleccionada) {
+                const selectEstudiante = document.getElementById('modal-estudiante');
+                const selectCurso = document.getElementById('modal-curso');
+                
+                // Limpiar opciones previas
+                selectEstudiante.innerHTML = '<option value="">Seleccionar estudiante...</option>';
+                selectCurso.innerHTML = '<option value="">Seleccionar curso...</option>';
+                
+                // Poblar estudiantes únicos
+                const estudiantes = [];
+                const estudiantesMap = new Map();
+                calificacionesActuales.forEach(item => {
+                    if (!estudiantesMap.has(item.inscripcion_id)) {
+                        estudiantesMap.set(item.inscripcion_id, {
+                            inscripcion_id: item.inscripcion_id,
+                            nombre: item.nombre_estudiante,
+                            curso_id: item.curso_id,
+                            nombre_curso: item.nombre_curso
+                        });
+                        estudiantes.push(estudiantesMap.get(item.inscripcion_id));
+                    }
+                });
+                
+                // Poblar cursos únicos
+                const cursos = [];
+                const cursosMap = new Map();
+                calificacionesActuales.forEach(item => {
+                    if (!cursosMap.has(item.curso_id)) {
+                        cursosMap.set(item.curso_id, {
+                            id: item.curso_id,
+                            nombre: item.nombre_curso
+                        });
+                        cursos.push(cursosMap.get(item.curso_id));
+                    }
+                });
+                
+                estudiantes.forEach(est => {
+                    const option = document.createElement('option');
+                    option.value = est.inscripcion_id;
+                    option.textContent = `${est.nombre} (${est.nombre_curso})`;
+                    selectEstudiante.appendChild(option);
+                });
+                
+                cursos.forEach(curso => {
+                    const option = document.createElement('option');
+                    option.value = curso.id;
+                    option.textContent = curso.nombre;
+                    selectCurso.appendChild(option);
+                });
+                
+                // Seleccionar los valores actuales
+                selectEstudiante.value = inscripcionId;
+                selectCurso.value = calificacionSeleccionada.curso_id;
+                document.getElementById('modal-tipo').value = calificacionSeleccionada.tipo_evaluacion || 'final';
+                document.getElementById('modal-calificacion').value = calificacionSeleccionada.calificacion || '';
+                document.getElementById('modal-comentarios').value = calificacionSeleccionada.comentarios || '';
+                document.getElementById('calificacion-modal').style.display = 'block';
+            }
+        }
+
+        function cerrarModalCalificacion() {
+            document.getElementById('calificacion-modal').style.display = 'none';
+            calificacionSeleccionada = null;
+        }
+
+        function guardarCalificacion() {
+            const inscripcionId = document.getElementById('modal-estudiante').value;
+            const cursoId = document.getElementById('modal-curso').value;
+            const calificacion = document.getElementById('modal-calificacion').value;
+            const comentarios = document.getElementById('modal-comentarios').value;
+            const tipoEvaluacion = document.getElementById('modal-tipo').value;
+
+            if (!inscripcionId || !cursoId) {
+                mostrarError('Debes seleccionar un estudiante y un curso');
+                return;
+            }
+
+            if (!calificacion || calificacion === '') {
+                mostrarError('La calificación es requerida');
+                return;
+            }
+
+            const data = {
+                inscripcion_id: parseInt(inscripcionId),
+                instructor_id: instructorId,
+                calificacion: parseFloat(calificacion),
+                comentarios: comentarios,
+                tipo_evaluacion: tipoEvaluacion
+            };
+
+            fetch('/agregar-calificacion/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    mostrarExito(result.message);
+                    cerrarModalCalificacion();
+                    cargarCalificaciones();
+                } else {
+                    mostrarError(result.message || 'Error al guardar la calificación');
+                }
+            })
+            .catch(error => {
+                mostrarError('Error en la solicitud');
+                console.error(error);
+            });
+        }
+
+        function mostrarExito(mensaje) {
+            const alert = document.getElementById('success-alert');
+            alert.textContent = mensaje;
+            alert.style.display = 'block';
+            setTimeout(() => { alert.style.display = 'none'; }, 4000);
+        }
+
+        function mostrarError(mensaje) {
+            const alert = document.getElementById('error-alert');
+            alert.textContent = mensaje;
+            alert.style.display = 'block';
+            setTimeout(() => { alert.style.display = 'none'; }, 4000);
+        }
+
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function logout() {
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        }
+
+        // Cerrar modal al hacer clic fuera de él
+        window.onclick = function(event) {
+            const modal = document.getElementById('calificacion-modal');
+            if (event.target === modal) {
+                cerrarModalCalificacion();
+            }
+        }
+    </script>
+</body>
+</html>
+
+
+

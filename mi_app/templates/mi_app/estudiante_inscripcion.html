@@ -1,0 +1,337 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Inscripción - Estudiante</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Panel del Estudiante</h1>
+        <div class="nav-links">
+            <a href="/estudiante-dashboard/">Menú</a>
+            <a href="/estudiante-mis-cursos/">Mis Cursos</a>
+            <a href="/estudiante-calificaciones/">Calificaciones</a>
+            <a href="/estudiante-inscripcion/" class="active">Inscripción</a>
+            <a href="/estudiante-perfil/">Perfil</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Inscripción a Cursos</h2>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Categoría</th>
+                        <th>Duración</th>
+                        <th>Costo</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-cursos-disponibles">
+                    <tr><td colspan="5" style="text-align:center;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="info-section" style="margin-top: 20px;">
+            <h3>Carrito de Cursos</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Curso</th>
+                        <th>Costo</th>
+                        <th>Quitar</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-carrito">
+                    <tr><td colspan="3">No has agregado cursos al carrito</td></tr>
+                </tbody>
+            </table>
+
+            <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+                <select id="metodo-pago-estudiante">
+                    <option value="">Seleccionar método de pago</option>
+                </select>
+                <input id="referencia-pago-estudiante" type="text" placeholder="Referencia de pago (opcional)">
+            </div>
+
+            <div id="tarjeta-fields-estudiante" style="display:none; margin-top: 12px;" class="form-grid">
+                <input id="titular-tarjeta-estudiante" type="text" placeholder="Nombre del Titular" autocomplete="cc-name">
+                <input id="numero-tarjeta-estudiante" type="text" placeholder="Número de Tarjeta" inputmode="numeric" maxlength="19" autocomplete="cc-number">
+                <input id="vencimiento-tarjeta-estudiante" type="text" placeholder="MM/AA" maxlength="5" inputmode="numeric" autocomplete="cc-exp">
+                <input id="cvv-tarjeta-estudiante" type="password" placeholder="CVV" maxlength="4" inputmode="numeric" autocomplete="cc-csc">
+            </div>
+
+            <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <strong id="total-carrito">Total a pagar: $0.00</strong>
+                <button class="btn btn-primary" onclick="confirmarInscripcionCursos()">Inscribirme y Pagar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let usuarioData = {};
+        let carritoCursos = [];
+        let cursosDisponibles = [];
+
+        function verificarEstudiante() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre || user.role !== 'estudiante') {
+                window.location.href = '/';
+                return false;
+            }
+            usuarioData = user;
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+            return true;
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function esMetodoTarjetaSeleccionado() {
+            const select = document.getElementById('metodo-pago-estudiante');
+            if (!select || !select.value) return false;
+            const textoMetodo = (select.options[select.selectedIndex]?.textContent || '').toLowerCase();
+            return textoMetodo.includes('tarjeta');
+        }
+
+        function toggleCamposTarjetaEstudiante() {
+            const esTarjeta = esMetodoTarjetaSeleccionado();
+            const camposTarjeta = document.getElementById('tarjeta-fields-estudiante');
+            const referencia = document.getElementById('referencia-pago-estudiante');
+
+            camposTarjeta.style.display = esTarjeta ? 'grid' : 'none';
+            referencia.style.display = esTarjeta ? 'none' : 'block';
+
+            if (esTarjeta) {
+                referencia.value = '';
+            }
+        }
+
+        function autoformatearNumeroTarjetaEstudiante(event) {
+            const input = event.target;
+            const soloDigitos = input.value.replace(/\D/g, '').slice(0, 19);
+            const grupos = soloDigitos.match(/.{1,4}/g) || [];
+            input.value = grupos.join(' ');
+        }
+
+        function autoformatearVencimientoTarjetaEstudiante(event) {
+            const input = event.target;
+            const soloDigitos = input.value.replace(/\D/g, '').slice(0, 4);
+            if (soloDigitos.length <= 2) {
+                input.value = soloDigitos;
+                return;
+            }
+            input.value = `${soloDigitos.slice(0, 2)}/${soloDigitos.slice(2)}`;
+        }
+
+        function filtrarCvvTarjetaEstudiante(event) {
+            const input = event.target;
+            input.value = input.value.replace(/\D/g, '').slice(0, 4);
+        }
+
+        function agregarCursoAlCarrito(cursoId) {
+            const curso = cursosDisponibles.find(c => c.curso_id === cursoId);
+            if (!curso) return;
+
+            if (carritoCursos.some(c => c.curso_id === cursoId)) {
+                alert('Ese curso ya está en el carrito');
+                return;
+            }
+
+            carritoCursos.push(curso);
+            renderCarrito();
+        }
+
+        function quitarCursoDelCarrito(cursoId) {
+            carritoCursos = carritoCursos.filter(c => c.curso_id !== cursoId);
+            renderCarrito();
+        }
+
+        function renderCarrito() {
+            const tbody = document.getElementById('tbody-carrito');
+            const totalEl = document.getElementById('total-carrito');
+
+            if (carritoCursos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3">No has agregado cursos al carrito</td></tr>';
+                totalEl.textContent = 'Total a pagar: $0.00';
+                return;
+            }
+
+            let total = 0;
+            tbody.innerHTML = carritoCursos.map(c => {
+                const costo = parseFloat(c.costo);
+                total += costo;
+                return `
+                    <tr>
+                        <td>${c.nombre_curso}</td>
+                        <td>$${costo.toFixed(2)}</td>
+                        <td><button class="btn btn-secondary" onclick="quitarCursoDelCarrito(${c.curso_id})">Quitar</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            totalEl.textContent = `Total a pagar: $${total.toFixed(2)}`;
+        }
+
+        async function cargarOpcionesInscripcion() {
+            try {
+                const [cursos, metodos] = await Promise.all([
+                    fetch(`/api/cursos-disponibles-estudiante/?estudiante_id=${usuarioData.id}`).then(r => r.json()),
+                    fetch('/api/metodos-pago/').then(r => r.json())
+                ]);
+
+                cursosDisponibles = Array.isArray(cursos) ? cursos : [];
+
+                const tbodyDisponibles = document.getElementById('tbody-cursos-disponibles');
+                if (cursosDisponibles.length === 0) {
+                    tbodyDisponibles.innerHTML = '<tr><td colspan="5" style="text-align:center;">No hay cursos disponibles para inscribirte</td></tr>';
+                } else {
+                    tbodyDisponibles.innerHTML = cursosDisponibles.map(curso => `
+                        <tr>
+                            <td>${curso.nombre_curso}</td>
+                            <td>${curso.categoria}</td>
+                            <td>${curso.duracion_horas} horas</td>
+                            <td>$${parseFloat(curso.costo).toFixed(2)}</td>
+                            <td><button class="btn btn-primary" onclick="agregarCursoAlCarrito(${curso.curso_id})">Agregar</button></td>
+                        </tr>
+                    `).join('');
+                }
+
+                const selectMetodo = document.getElementById('metodo-pago-estudiante');
+                selectMetodo.innerHTML = '<option value="">Seleccionar método de pago</option>';
+                (Array.isArray(metodos) ? metodos : []).forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.metodo_id;
+                    option.textContent = m.nombre;
+                    selectMetodo.appendChild(option);
+                });
+
+                toggleCamposTarjetaEstudiante();
+
+                renderCarrito();
+            } catch (error) {
+                document.getElementById('tbody-cursos-disponibles').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#e74c3c;">Error cargando cursos</td></tr>';
+            }
+        }
+
+        async function confirmarInscripcionCursos() {
+            if (carritoCursos.length === 0) {
+                alert('Debes agregar al menos un curso al carrito');
+                return;
+            }
+
+            const metodoId = document.getElementById('metodo-pago-estudiante').value;
+            const referenciaManual = document.getElementById('referencia-pago-estudiante').value.trim();
+
+            const esTarjeta = esMetodoTarjetaSeleccionado();
+            const metodoTexto = (document.getElementById('metodo-pago-estudiante').selectedOptions[0]?.textContent || '').toLowerCase();
+            const tipoTarjeta = metodoTexto.includes('credito') || metodoTexto.includes('crédito')
+                ? 'CREDITO'
+                : (metodoTexto.includes('debito') || metodoTexto.includes('débito') ? 'DEBITO' : 'TARJETA');
+            const titularTarjeta = document.getElementById('titular-tarjeta-estudiante').value.trim();
+            const numeroTarjeta = document.getElementById('numero-tarjeta-estudiante').value.replace(/\s+/g, '').trim();
+            const vencimientoTarjeta = document.getElementById('vencimiento-tarjeta-estudiante').value.trim();
+            const cvvTarjeta = document.getElementById('cvv-tarjeta-estudiante').value.trim();
+
+            if (!metodoId) {
+                alert('Selecciona un método de pago');
+                return;
+            }
+
+            if (esTarjeta) {
+                const numeroValido = /^\d{13,19}$/.test(numeroTarjeta);
+                const vencimientoValido = /^(0[1-9]|1[0-2])\/(\d{2})$/.test(vencimientoTarjeta);
+                const cvvValido = /^\d{3,4}$/.test(cvvTarjeta);
+                let tarjetaVigente = false;
+
+                if (vencimientoValido) {
+                    const [mesStr, anioStr] = vencimientoTarjeta.split('/');
+                    const mesVencimiento = parseInt(mesStr, 10);
+                    const anioVencimiento = 2000 + parseInt(anioStr, 10);
+
+                    const hoy = new Date();
+                    const mesActual = hoy.getMonth() + 1;
+                    const anioActual = hoy.getFullYear();
+
+                    tarjetaVigente = anioVencimiento > anioActual || (anioVencimiento === anioActual && mesVencimiento >= mesActual);
+                }
+
+                if (!titularTarjeta || !numeroValido || !vencimientoValido || !cvvValido) {
+                    alert('Completa correctamente los datos de la tarjeta (titular, número, vencimiento MM/AA y CVV).');
+                    return;
+                }
+
+                if (!tarjetaVigente) {
+                    alert('La tarjeta está vencida. Verifica la fecha de vencimiento.');
+                    return;
+                }
+            }
+
+            const referenciaPago = esTarjeta
+                ? `Tarjeta ${tipoTarjeta.toUpperCase()} ****${numeroTarjeta.slice(-4)} | Titular: ${titularTarjeta} | Vence: ${vencimientoTarjeta}`
+                : referenciaManual;
+
+            const total = carritoCursos.reduce((sum, c) => sum + parseFloat(c.costo), 0);
+            const confirmar = confirm(`Vas a inscribirte en ${carritoCursos.length} curso(s). Total a pagar: $${total.toFixed(2)}. ¿Deseas continuar?`);
+            if (!confirmar) return;
+
+            try {
+                const response = await fetch('/api/inscribir-estudiante-cursos/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        estudiante_id: usuarioData.id,
+                        cursos_ids: carritoCursos.map(c => c.curso_id),
+                        metodo_id: metodoId,
+                        referencia_pago: referenciaPago
+                    })
+                });
+
+                const result = await response.json();
+                if (!result.success) {
+                    alert('Error: ' + (result.message || 'No fue posible completar la inscripción'));
+                    return;
+                }
+
+                alert(`Inscripción exitosa.\nCursos inscritos: ${result.total_cursos}\nTotal pagado: $${parseFloat(result.total_pagado).toFixed(2)}`);
+                carritoCursos = [];
+                document.getElementById('metodo-pago-estudiante').value = '';
+                document.getElementById('referencia-pago-estudiante').value = '';
+                document.getElementById('titular-tarjeta-estudiante').value = '';
+                document.getElementById('numero-tarjeta-estudiante').value = '';
+                document.getElementById('vencimiento-tarjeta-estudiante').value = '';
+                document.getElementById('cvv-tarjeta-estudiante').value = '';
+                toggleCamposTarjetaEstudiante();
+                await cargarOpcionesInscripcion();
+            } catch (error) {
+                alert('Error procesando la inscripción');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (verificarEstudiante()) {
+                document.getElementById('metodo-pago-estudiante').addEventListener('change', toggleCamposTarjetaEstudiante);
+                document.getElementById('numero-tarjeta-estudiante').addEventListener('input', autoformatearNumeroTarjetaEstudiante);
+                document.getElementById('vencimiento-tarjeta-estudiante').addEventListener('input', autoformatearVencimientoTarjetaEstudiante);
+                document.getElementById('cvv-tarjeta-estudiante').addEventListener('input', filtrarCvvTarjetaEstudiante);
+                cargarOpcionesInscripcion();
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

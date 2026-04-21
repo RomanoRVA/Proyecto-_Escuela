@@ -1,0 +1,201 @@
+﻿{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión de Cursos</title>
+    <link rel="stylesheet" href="{% static 'css/profesional.css' %}">
+</head>
+<body class="app-page">
+    <nav>
+        <h1>Plataforma Educativa</h1>
+        <div class="nav-links">
+            <a href="javascript:void(0)" onclick="irAlDashboard()">Menú</a>
+            <a href="/estudiantes-page/">Estudiantes</a>
+            <a href="/instructores-page/">Instructores</a>
+            <a href="/cursos-page/" class="active">Cursos</a>
+            <a href="/inscripciones-page/">Inscripciones</a>
+            <a href="/pagos-page/">Pagos</a>
+            <a href="/asignacion-cursos-page/">Asignación Docente</a>
+            <a href="/reportes-page/">Reportes</a>
+            <span id="usuario-nombre" style="margin: 0 10px;"></span>
+            <a href="#" onclick="logout()" class="logout">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h2>Gestión de Cursos</h2>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="toggleForm()">+ Agregar Curso</button>
+        </div>
+
+        <div class="form-container" id="form-container">
+            <h3 style="margin-bottom: 20px; color: #2c3e50;">Crear Nuevo Curso</h3>
+            <div class="form-grid">
+                <input id="nombre" placeholder="Nombre del Curso" type="text">
+                <input id="categoria" placeholder="Categoría" type="text">
+                <input id="cupo" placeholder="Cupo Máximo" type="number" value="5">
+                <input id="horas" placeholder="Duración (horas)" type="number">
+                <input id="costo" placeholder="Costo" type="number" step="0.01">
+                <select id="estado">
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="createCurso()">Guardar Curso</button>
+                <button class="btn btn-secondary" onclick="toggleForm()">Cancelar</button>
+            </div>
+        </div>
+
+        <div class="table-container">
+            <table id="cursosTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Cupo</th>
+                        <th>Duración</th>
+                        <th>Costo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody id="tbody-cursos">
+                    <tr><td colspan="7" style="text-align: center; padding: 30px;">Cargando cursos...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarUsuario();
+            ajustarNavegacionInstructor();
+            cargarCursos();
+        });
+
+        function verificarUsuario() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (!user.nombre) {
+                window.location.href = '/';
+                return;
+            }
+            if (user.role === 'instructor') {
+                alert('Los instructores no tienen acceso a la gestión de cursos.');
+                window.location.href = '/instructor-dashboard/';
+                return;
+            }
+            document.getElementById('usuario-nombre').textContent = user.nombre;
+        }
+
+        function ajustarNavegacionInstructor() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'instructor') {
+                document.querySelectorAll('a[href="/inscripciones-page/"], a[href="/reportes-page/"]').forEach(el => el.remove());
+            }
+        }
+
+        function logout() {
+            if (confirm('¿Deseas cerrar sesión?')) {
+                localStorage.removeItem('user');
+                window.location.href = '/';
+            }
+        }
+
+        function irAlDashboard() {
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.role === 'admin') {
+                window.location.href = '/admin-dashboard/';
+            } else if (user.role === 'instructor') {
+                window.location.href = '/instructor-dashboard/';
+            } else if (user.role === 'estudiante') {
+                window.location.href = '/estudiante-dashboard/';
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        function toggleForm() {
+            document.getElementById('form-container').classList.toggle('show');
+        }
+
+        async function cargarCursos() {
+            try {
+                const response = await fetch('/api/cursos/');
+                const cursos = await response.json();
+                const tbody = document.getElementById('tbody-cursos');
+                
+                if (cursos.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No hay cursos registrados</td></tr>';
+                } else {
+                    tbody.innerHTML = cursos.map(c => `
+                        <tr>
+                            <td>#${c.curso_id}</td>
+                            <td><strong>${c.nombre_curso}</strong></td>
+                            <td>${c.categoria}</td>
+                            <td>${c.cupo_maximo}</td>
+                            <td>${c.duracion_horas} horas</td>
+                            <td>$${parseFloat(c.costo).toFixed(2)}</td>
+                            <td><span class="badge badge-${c.estado === 'activo' ? 'active' : 'inactive'}">${c.estado.toUpperCase()}</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('tbody-cursos').innerHTML = '<tr><td colspan="7" style="text-align: center; color: red;">Error cargando cursos</td></tr>';
+            }
+        }
+
+        async function createCurso() {
+            const nombre = document.getElementById('nombre').value.trim();
+            const categoria = document.getElementById('categoria').value.trim();
+            const cupo = document.getElementById('cupo').value;
+            const horas = document.getElementById('horas').value;
+            const costo = document.getElementById('costo').value;
+            const estado = document.getElementById('estado').value;
+
+            if (!nombre || !categoria || !horas || !costo) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/cursos/create/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre_curso: nombre,
+                        categoria: categoria,
+                        cupo_maximo: cupo,
+                        duracion_horas: horas,
+                        costo: costo,
+                        estado: estado
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert('Curso creado exitosamente');
+                    document.getElementById('nombre').value = '';
+                    document.getElementById('categoria').value = '';
+                    document.getElementById('cupo').value = '5';
+                    document.getElementById('horas').value = '';
+                    document.getElementById('costo').value = '';
+                    toggleForm();
+                    cargarCursos();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            } catch (error) {
+                alert('Error creando curso');
+                console.error(error);
+            }
+        }
+    </script>
+</body>
+</html>
+
+
