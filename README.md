@@ -110,6 +110,12 @@ Si restauras el backup incluido, podras usar los usuarios ya cargados en esa bas
 - La carpeta `media/` se usa para entregas de estudiantes.
 - `.gitignore` excluye entorno virtual, caches y artefactos locales.
 
+## Nota del backup incluido
+
+- Archivo: `SQL_BACKUP/PF1.bak`
+- Tamano aproximado: 7.52 MB (7,889,408 bytes)
+- Ultima modificacion local: 2026-04-20 18:32:02
+
 ## Solucion de problemas rapida
 
 - Error de conexion SQL Server:
