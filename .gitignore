@@ -20,7 +20,8 @@ Thumbs.db
 .idea/
 
 # Local backup artifacts
-SQL_BACKUP/
+SQL_BACKUP/*
+!SQL_BACKUP/PF1.bak
 
 # Secrets/local env
 .env
